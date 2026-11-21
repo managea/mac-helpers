@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [{ "type": "command", "bash": "\"${COPILOT_HOME:-$HOME/.copilot}/hooks/agent-status.sh\" sessionStart", "timeoutSec": 5 }],
+    "userPromptSubmitted": [{ "type": "command", "bash": "\"${COPILOT_HOME:-$HOME/.copilot}/hooks/agent-status.sh\" userPromptSubmitted", "timeoutSec": 5 }],
+    "notification": [{ "type": "command", "bash": "\"${COPILOT_HOME:-$HOME/.copilot}/hooks/agent-status.sh\" notification", "timeoutSec": 5 }],
+    "agentStop": [{ "type": "command", "bash": "\"${COPILOT_HOME:-$HOME/.copilot}/hooks/agent-status.sh\" agentStop", "timeoutSec": 5 }],
+    "preCompact": [{ "type": "command", "bash": "\"${COPILOT_HOME:-$HOME/.copilot}/hooks/agent-status.sh\" preCompact", "timeoutSec": 5 }],
+    "errorOccurred": [{ "type": "command", "bash": "\"${COPILOT_HOME:-$HOME/.copilot}/hooks/agent-status.sh\" errorOccurred", "timeoutSec": 5 }],
+    "sessionEnd": [{ "type": "command", "bash": "\"${COPILOT_HOME:-$HOME/.copilot}/hooks/agent-status.sh\" sessionEnd", "timeoutSec": 5 }]
+  }
+}

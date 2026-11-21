@@ -1,0 +1,11 @@
+# Sample links for the tests: name URL [profile]
+gh https://github.com
+Mail https://mail.example.com/ Work
+  # old https://old.example.com
+#off https://off.example.com
+cal calendar.example.com Profile 2
+side   https://side.example.com   Side Project
+docs https://docs.example.com/home # the team's docs
+wiki https://wiki.example.com/a#top Work	# a tab before the comment
+frag https://example.com/page#section
+dev localhost:3000/app Test #local

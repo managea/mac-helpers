@@ -1,0 +1,15 @@
+{
+  "browser": { "enabled_labs_experiments": [], "last_redirect_origin": "" },
+  "profile": {
+    "info_cache": {
+      "Default": { "name": "Personal", "avatar_icon": "chrome://theme/IDR_PROFILE_AVATAR_26", "gaia_name": "Sam Example", "gaia_given_name": "Sam" },
+      "Profile 1": { "name": "Work", "is_ephemeral": false, "managed_user_id": null, "gaia_name": "Sam Example", "gaia_given_name": "Sam" },
+      "Profile 2": { "name": "Admin", "background_apps": false, "gaia_name": "" },
+      "Profile 3": { "name": "Test", "gaia_name": "Pat Tester", "gaia_given_name": "Pat" },
+      "Profile 5": { "name": "Side Project", "active_time": 1763700000.5 }
+    },
+    "last_used": "Profile 1",
+    "last_active_profiles": [ "Default", "Profile 1" ]
+  },
+  "variations_compressed_seed": "c2FtcGxl"
+}

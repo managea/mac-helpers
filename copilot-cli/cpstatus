@@ -1,0 +1,16 @@
+#!/bin/zsh
+# One line per Copilot CLI session from the status log ($COPILOT_HOME, else ~/.copilot, then agent-status.log), newest
+# first: name, latest state, how long ago. The log keeps times only, so ages are for today; a time later than now
+# reads "before today".
+log=${COPILOT_HOME:-$HOME/.copilot}/agent-status.log
+[[ -r $log ]] || { print -u2 "cpstatus: no status log at $log"; exit 1; }
+tail -n 500 $log | awk -v now="$(date +%H:%M:%S)" '
+  function secs(t, p) { split(t, p, ":"); return p[1] * 3600 + p[2] * 60 + p[3] }
+  $1 ~ /^[0-9][0-9]:[0-9][0-9]:[0-9][0-9]$/ && NF >= 3 { time[$2] = $1; state[$2] = $3; order[$2] = NR }
+  END {
+    for (n in order) {
+      age = secs(now) - secs(time[n])
+      ago = age < 0 ? "before today" : age < 60 ? age "s ago" : age < 3600 ? int(age / 60) "m ago" : int(age / 3600) "h ago"
+      printf "%d\t%-24s %-17s %s\n", order[n], n, state[n], ago
+    }
+  }' | sort -rn | cut -f2-

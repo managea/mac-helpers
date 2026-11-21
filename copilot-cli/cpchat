@@ -1,0 +1,80 @@
+#!/bin/zsh
+# The last messages of a Copilot CLI session as text, one line each:
+#   cpchat [NAME|ID-PREFIX|.] [N] [-a] [-f]
+# NAME (as in the status log, spaces or underscores) or the start of a session id picks the session, the newest when
+# several match; without one, or with ".", the newest session started in this folder. N messages, 20 by default. -a adds a line per
+# tool call and prints a question the agent asked (its ask_user tool) whole, with its choices; -f prints long
+# messages whole, else they are cut at 400 characters.
+# It reads session-state/<id>/events.jsonl in $COPILOT_HOME, else ~/.copilot: the main conversation only (a subagent's events carry an
+# agentId), user and assistant messages that have text, in local time, a reply repeated back to back once.
+all=0 full=0
+args=()
+for a in "$@"; do
+  case $a in
+    -a) all=1 ;;
+    -f) full=1 ;;
+    -*) print -u2 "cpchat: usage: cpchat [NAME|ID-PREFIX|.] [N] [-a] [-f]"; exit 2 ;;
+    *) args+=("$a") ;;
+  esac
+done
+(( ${#args} <= 2 )) || { print -u2 "cpchat: usage: cpchat [NAME|ID-PREFIX|.] [N] [-a] [-f]"; exit 2; }
+pick=${args[1]-}
+[[ $pick == . ]] && pick=
+count=${args[2]-20}
+[[ $count == <1-> ]] || { print -u2 "cpchat: N must be a whole number above 0"; exit 2; }
+
+# The value of a top-level key in a workspace.yaml, without quotes.
+yaml_value() {
+  local v
+  v=$(sed -n "/^$1:/{s/^$1:[[:space:]]*//;s/[[:space:]]*\$//;p;q;}" $2 2>/dev/null)
+  v=${v#[\"\']}
+  print -r -- "${v%[\"\']}"
+}
+
+# Newest first (zsh orders the files by modification time), so the first match is the one.
+best=
+for f in ${COPILOT_HOME:-$HOME/.copilot}/session-state/*/events.jsonl(N.om); do
+  d=${f:h}
+  if [[ -n $pick ]]; then
+    n=$(yaml_value name $d/workspace.yaml)
+    [[ $n == $pick || ${n// /_} == $pick || ${d:t} == $pick* ]] || continue
+  else
+    c=$(yaml_value cwd $d/workspace.yaml)
+    [[ -n $c && ${c:A} == ${PWD:A} ]] || continue
+  fi
+  best=$f
+  break
+done
+[[ -n $best ]] || { print -u2 "cpchat: no session ${pick:-started in $PWD}"; exit 1; }
+
+out=$(jq -Rnr --argjson limit $count --arg all $all --arg full $full '
+  # Control characters out: a tab or line break becomes a space, any other one a question mark.
+  def clean: tostring | explode | map(if . == 9 or . == 10 or . == 13 then 32
+    elif . < 32 or (. >= 127 and . < 160) then 63 else . end) | implode | sub("^ +"; "") | sub(" +$"; "");
+  def clock: (.timestamp // "") | tostring | sub("\\.[0-9]+"; "") | (try (fromdateiso8601 | strflocaltime("%H:%M")) catch "--:--");
+  def cut: if $full == "1" or length <= 400 then . else .[0:400] + "..." end;
+  [inputs | fromjson? | select(type == "object" and (.agentId // "") == "")
+    | if .type == "user.message" or .type == "assistant.message" then
+        ((.data.content // "") | clean) as $t | select($t != "")
+        | {kind: (if .type == "user.message" then "user" else "asst" end), text: ($t | cut), time: clock}
+      elif $all == "1" and .type == "tool.execution_start" then
+        if .data.toolName == "ask_user" then
+          {kind: "question", text: ((.data.arguments.message // "") | clean),
+           choices: ((.data.arguments.requestedSchema // {}) | tojson | clean), time: clock}
+        else {kind: "tool", text: ((.data.toolName // "tool") | clean), time: clock} end
+      else empty end]
+  # A reply that repeats the last reply is left out, also with tool lines between them.
+  | reduce .[] as $x ({items: [], last: null};
+      if $x.kind == "asst" and $x.text == .last then .
+      elif $x.kind == "user" or $x.kind == "asst" then .items += [$x] | .last = (if $x.kind == "asst" then $x.text else null end)
+      else .items += [$x] end)
+  | .items as $items
+  | [$items | to_entries[] | select(.value.kind == "user" or .value.kind == "asst") | .key] as $messages
+  | if ($messages | length) == 0 then empty else
+      $items[($messages[-$limit:] | first):][]
+      | if .kind == "question" then "\(.time) question: \(.text) | choices: \(.choices)"
+        elif .kind == "tool" then "\(.time) tool: \(.text)"
+        else "\(.time) \(.kind): \(.text)" end
+    end' < $best 2>/dev/null)
+[[ -n $out ]] || { print -u2 "cpchat: no messages parsed in $best (format changed?)"; exit 1; }
+print -r -- "$out"
