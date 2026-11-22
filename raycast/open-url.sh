@@ -17,11 +17,11 @@ if(f[1]&&!(k in L))L[k]=[f[1],f.slice(2).join(' ')]}
 var e=L[w[0].toLowerCase()]
 if(!e)return v[0]?'ERR not a URL':(a=url(a))?[a,p]:'ERR not a URL'
 var x=(s,d)=>s.replace(/\{([\w.-]*)\}/g,(m,k)=>{if(!k)k=String(++q)
-if(/^\d+$/.test(k))return n=Math.max(n,+k),v[k-1]||m
+if(/^\d+$/.test(k))return+k?(n=Math.max(n,+k),v[k-1]||m):(b=b||'ERR places start at {1}',m)
 var c=L[k.toLowerCase()];if(!c||d>4)return b=b||'ERR '+(c?'links nested too deep at {'+k+'}':'no link {'+k+'}'),m
 r=r||c[1];return x(c[0],d+1)})
 a=x(e[0],0);if(b)return b
-if(n!=v.length)return'ERR '+w[0]+(n?' needs '+n+' value'+(n>1?'s':''):' takes no values')
+if(n!=v.length)return'ERR '+(n?'needs '+n+' value'+(n>1?'s':''):'takes no values')
 return(a=url(a))?[a,p||e[1]||r]:'ERR not a URL'}
 var names=t=>Object.entries(JSON.parse(t||'{}')).map(([f,c])=>[f,c.name||f,c.gaia_name,c.gaia_given_name])
 var nz=s=>(s||'').normalize('NFKC').replace(/[\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/g,'').replace(/[\u2010-\u2015\u2212]/g,'-').replace(/\s+/g,' ').trim().toLowerCase(),folder=(N,p,k=N.filter(r=>r.some(x=>x&&nz(x)==nz(p))))=>k[1]?'':k[0]
@@ -34,7 +34,7 @@ return p<0&&M[i].length==s.length&&M[i].every(k=>m[k][2]==m[M[i][0]][2]&&M.every
 f=P.flatMap((j,i)=>j<0?i:[]);g=m.flatMap((y,k)=>y&&!P.includes(k)?k:[])
 if(f.length*g.length==1)P[f[0]]=g[0]
 return P.map(j=>j<0?'':A[j])}
-function run(v,X){X=typeof X=='function'?X:Application;try{v=v.map(x=>(x||'').trim());var T=target(v[0]||(v[2][1999]?'':v[2]),v[1],v[3]),N=names(v[5]),k='',z='',b=x=>x.replace(/Google | Browser/,'')
+function run(v,X){X=typeof X=='function'?X:Application;try{v=v.map(x=>(x||'').trim());var c=v[2][1999]?'':v[2],T=v[0]?target(v[0],v[1],v[3]):/\s/.test(c)?'ERR not a URL':target(c,v[1],v[3]),N=names(v[5]),k='',z='',b=x=>x.replace(/Google | Browser/,'')
 if(!T.map)return T
 var u=T[0],p=T[1],f=p&&folder(N,p),m=norm(u),d=' '+m.replace(/^.*?\/\//,'').slice(0,60)
 if(p&&!f)return'ERR unknown profile: '+p

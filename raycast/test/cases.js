@@ -340,16 +340,18 @@ function run(argv) {
     eq('target values in order', target('logs g1 s1', '', links), ['https://console.example.com/cw/home?r=x#logs:group/g1/stream/s1', 'Work'])
     eq('target own profile over the shared part', target('own', '', links), ['https://console.example.com/a', 'Test'])
     eq('target arg profile over both', target('fn alpha', 'Side Project', links), ['https://console.example.com/fn/home?r=x#/functions/alpha', 'Side Project'])
-    eq('target a value missing', target('fn', '', links), 'ERR fn needs 1 value')
-    eq('target two values missing one', target('logs g1', '', links), 'ERR logs needs 2 values')
-    eq('target a value too many', target('fn a b', '', links), 'ERR fn needs 1 value')
-    eq('target values to a plain link', target('gh x', '', links), 'ERR gh takes no values')
+    eq('target a value missing', target('fn', '', links), 'ERR needs 1 value')
+    eq('target two values missing one', target('logs g1', '', links), 'ERR needs 2 values')
+    eq('target a value too many', target('fn a b', '', links), 'ERR needs 1 value')
+    eq('target values to a plain link', target('gh x', '', links), 'ERR takes no values')
     eq('target a shared part that is a host', target('host', '', links), ['https://example.com/p', ''])
     eq('target links that loop', target('deep1', '', links), 'ERR links nested too deep at {deep1}')
     eq('target a shared part missing', target('miss', '', links), 'ERR no link {nope}')
     eq('target a value is not expanded again', target('fn {base}', '', links), ['https://console.example.com/fn/home?r=x#/functions/{base}', 'Work'])
     eq('target a name like a built-in', target('constructor', '', 'constructor https://x.example.com'), ['https://x.example.com', ''])
     eq('target a built-in name not in the file', target('constructor', '', links), 'ERR not a URL')
+    eq('target places start at 1', target('z0 a', '', 'z0 https://example.com/{0}'), 'ERR places start at {1}')
+    eq('target braces written as %7B %7D', target('lit', '', 'lit https://example.com/s?q=%7Ba%7D'), ['https://example.com/s?q=%7Ba%7D', ''])
   }
 
   // Open URL's own run(), in pretend worlds. Its arguments: name or URL, profile, clipboard,
@@ -492,6 +494,8 @@ function run(argv) {
     eq('run typed URL of 2,000 characters: opened',
       go(args('https://example.com/' + 'a'.repeat(1980), '', 'x'.repeat(2000), FINDER), {})[1].length, "sh open '' >/dev/null 2>&1 &".length + 2000)
     eq('run clipboard with a number', go(args('', '', '8080'), chrome(two, [])), ['ERR not a URL'])
+    eq('run clipboard words never fill a link', go(args('', '', 'logs are noisy'), chrome(two, [])), ['ERR not a URL'])
+    eq('run clipboard name with a word is not echoed', go(args('', '', 'docs are here'), chrome(two, [])), ['ERR not a URL'])
     eq('run old check word is no longer special', go(args('?windows'), chrome(two, [])), ['ERR not a URL'])
   }
 

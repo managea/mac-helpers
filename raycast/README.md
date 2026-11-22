@@ -81,7 +81,7 @@ cal     calendar.example.com                  Profile 2
 docs    https://docs.example.com/home#team    Side Project   # a comment
 ```
 
-**Shared parts and values.** A URL may hold `{name}`, the URL of another line (up to five deep), so a part that many links share is written once; a link without a profile of its own takes the profile of the first part it uses. `{}` (in turn) or `{1}`, `{2}` ... stand for the words typed after the name in the first field, each word as typed, so one line serves every page that differs only by a name:
+**Shared parts and values.** A URL may hold `{name}`, the URL of another line (up to five deep), so a part that many links share is written once; a link without a profile of its own takes the profile of the first part it uses that has one. `{}` (in turn) or `{1}`, `{2}` ... stand for the words typed after the name in the first field, each word as typed, so one line serves every page that differs only by a name:
 
 ```
 console  https://console.example.com              Work
@@ -89,7 +89,7 @@ fn       {console}/functions/home#/functions/{}
 logs     {console}/logs/home#group/{1}/stream/{2}
 ```
 
-`fn checkout` opens `https://console.example.com/functions/home#/functions/checkout` in Work; `logs api 2026-11-22` fills both. A link given more or fewer words than it has places is `ERR fn needs 1 value`; words after a link without places are `ERR gh takes no values`; `ERR no link {name}` names a part that is not there.
+`fn checkout` opens `https://console.example.com/functions/home#/functions/checkout` in Work; `logs api 2026-11-22` fills both. Places are numbered from `{1}`. A link given more or fewer words than it has places is `ERR needs 1 value`; words after a link without places are `ERR takes no values` (neither message repeats what was typed); `ERR no link {name}` names a part the file lacks. Values come only from the first field, never from the clipboard: with both fields empty the clipboard must be one URL or one name. A URL that holds a brace itself is written with `%7B` and `%7D`.
 
 ## Browser Tabs
 
