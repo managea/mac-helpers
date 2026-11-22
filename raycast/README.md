@@ -33,7 +33,7 @@ Press the hotkey, then:
 
 What it does:
 
-1. Compares URLs after normalizing them: lowercase scheme and host, no default port (`:80` for http, `:443` for https), no fragment, one trailing slash of the path dropped; the query must match exactly.
+1. Compares URLs after normalizing them: lowercase scheme and host, no default port (`:80` for http, `:443` for https), no fragment that only names a place in the page (`#top`, `#section-2`; a fragment that is a route or a view, such as `#/functions/a`, `#!/a` or `#metricsV2:graph=...`, is kept: single-page apps tell their pages apart by it), one trailing slash of the path dropped; the query must match exactly.
 2. Without a profile: scans Chrome, Brave and Safari, every window and tab, the frontmost browser first; any match counts. With a profile: scans Chrome only, and only a window known to belong to that profile counts.
 3. A match: makes it the active tab, takes its window out of the Dock if it is minimized, raises it and brings the browser forward.
 4. No match: with a profile, `open -na "Google Chrome" --args --profile-directory="<folder>" "<url>"`; without one, `open -a` the frontmost browser if it is Chrome, Brave or Safari (a new tab in its front window), else `open` in the default browser. `open` runs in the background, so the toast never waits for it (and an `open` that fails is not reported).

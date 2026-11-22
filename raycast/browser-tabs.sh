@@ -5,8 +5,8 @@
 # @raycast.packageName Browser
 osascript -l JavaScript - \
  "$(plutil -extract profile.info_cache json -o - ~/Library/Application\ Support/Google/Chrome/Local\ State 2>/dev/null)" <<'JS'
-function norm(u){var m=/^([\w+.-]+:\/\/[^\/?#]*)?([^?#]*)([^#]*)/.exec(u)
-return(m[1]||'').toLowerCase().replace(/^(http:.*):80$|^(https:.*):443$/,'$1$2')+m[2].replace(/\/$/,'')+m[3]}
+function norm(u){var m=/^([\w+.-]+:\/\/[^\/?#]*)?([^?#]*)([^#]*)(#.*)?/.exec(u),f=m[4]||''
+return(m[1]||'').toLowerCase().replace(/^(http:.*):80$|^(https:.*):443$/,'$1$2')+m[2].replace(/\/$/,'')+m[3]+(/^#[\w.-]*$/.test(f)?'':f)}
 var names=t=>Object.entries(JSON.parse(t||'{}')).map(([f,c])=>[f,c.name||f,c.gaia_name,c.gaia_given_name])
 var nz=s=>(s||'').normalize('NFKC').replace(/[\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/g,'').replace(/[\u2010-\u2015\u2212]/g,'-').replace(/\s+/g,' ').trim().toLowerCase(),folder=(N,p,k=N.filter(r=>r.some(x=>x&&nz(x)==nz(p))))=>k[1]?'':k[0]
 var R=/^(?:(.*) )?- google chrome(?: - (.+))?$/

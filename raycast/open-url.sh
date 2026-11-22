@@ -7,8 +7,8 @@
 # @raycast.argument2 {"type":"text","placeholder":"profile","optional":true}
 osascript -l JavaScript - "$1" "$2" "$(pbpaste|head -c 2000|head -1)" "$(cat ~/.config/open-url/links.txt 2>/dev/null)" "$(lsappinfo visibleProcessList)" \
  "$(plutil -extract profile.info_cache json -o - ~/Library/Application\ Support/Google/Chrome/Local\ State 2>/dev/null)" <<'JS'
-function norm(u){var m=/^([\w+.-]+:\/\/[^\/?#]*)?([^?#]*)([^#]*)/.exec(u)
-return(m[1]||'').toLowerCase().replace(/^(http:.*):80$|^(https:.*):443$/,'$1$2')+m[2].replace(/\/$/,'')+m[3]}
+function norm(u){var m=/^([\w+.-]+:\/\/[^\/?#]*)?([^?#]*)([^#]*)(#.*)?/.exec(u),f=m[4]||''
+return(m[1]||'').toLowerCase().replace(/^(http:.*):80$|^(https:.*):443$/,'$1$2')+m[2].replace(/\/$/,'')+m[3]+(/^#[\w.-]*$/.test(f)?'':f)}
 function url(a){var m=/^((([\w-]+\.)*localhost|([\w-]+\.)+local|\d{1,3}(\.\d{1,3}){3})|([\w-]+\.)+(?!(txt|md|json|js|ts|py|sh|log|csv)\b)[a-z]{2,})(:\d+)?([\/?#]\S*)?$/i.exec(a)
 return/^https?:\/\/[^\s\/?#]\S*$/i.test(a)?a:m?'http'+(m[2]?'':'s')+'://'+a:''}
 function target(a,p,t){for(var l of t.split('\n')){var f=l.replace(/(^|\s)#.*/,'').trim().split(/\s+/)
