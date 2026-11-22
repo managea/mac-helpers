@@ -28,7 +28,7 @@ A browser that is not running is skipped without being launched.
 Press the hotkey, then:
 
 - **Enter** with both fields empty: opens the first line of the clipboard. Only the first 2,000 bytes of the clipboard are read; a first line that fills them may be cut, so it is `ERR not a URL` (type or link such a URL instead).
-- A **name** from `links.txt`, or a URL. Only `http://` and `https://` URLs are opened. After the scheme there must be a host (`https:///` is not a URL). A host without a scheme gets `https://` (`example.com/a`) when it ends in a dot and two or more letters that are not a common file ending (`txt`, `md`, `json`, `js`, `ts`, `py`, `sh`, `log`, `csv`: `notes.txt` is not a site; write `https://example.md` for one). `localhost`, names under `.localhost` and `.local`, and numeric addresses get `http://` (`localhost:3000`, `foo.localhost:3000`, `host.local:8080`, `127.0.0.1:8080`, `10.15.7.1`). A bare number, or dotted numbers that are not an address (`1.2.3`), are never a host. Anything else is `ERR not a URL`, without the text (it may be whatever was on the clipboard).
+- A **name** from `links.txt` (with the words its places need, below), or a URL. Only `http://` and `https://` URLs are opened. After the scheme there must be a host (`https:///` is not a URL). A host without a scheme gets `https://` (`example.com/a`) when it ends in a dot and two or more letters that are not a common file ending (`txt`, `md`, `json`, `js`, `ts`, `py`, `sh`, `log`, `csv`: `notes.txt` is not a site; write `https://example.md` for one). `localhost`, names under `.localhost` and `.local`, and numeric addresses get `http://` (`localhost:3000`, `foo.localhost:3000`, `host.local:8080`, `127.0.0.1:8080`, `10.15.7.1`). A bare number, or dotted numbers that are not an address (`1.2.3`), are never a host. Anything else is `ERR not a URL`, without the text (it may be whatever was on the clipboard).
 - Optionally a **profile** in the second field: a Chrome profile's folder (`Profile 1`) or name (`Work`, any case). It overrides the profile in `links.txt`.
 
 What it does:
@@ -80,6 +80,16 @@ mail    https://mail.example.com/             Work
 cal     calendar.example.com                  Profile 2
 docs    https://docs.example.com/home#team    Side Project   # a comment
 ```
+
+**Shared parts and values.** A URL may hold `{name}`, the URL of another line (up to five deep), so a part that many links share is written once; a link without a profile of its own takes the profile of the first part it uses. `{}` (in turn) or `{1}`, `{2}` ... stand for the words typed after the name in the first field, each word as typed, so one line serves every page that differs only by a name:
+
+```
+console  https://console.example.com              Work
+fn       {console}/functions/home#/functions/{}
+logs     {console}/logs/home#group/{1}/stream/{2}
+```
+
+`fn checkout` opens `https://console.example.com/functions/home#/functions/checkout` in Work; `logs api 2026-11-22` fills both. A link given more or fewer words than it has places is `ERR fn needs 1 value`; words after a link without places are `ERR gh takes no values`; `ERR no link {name}` names a part that is not there.
 
 ## Browser Tabs
 

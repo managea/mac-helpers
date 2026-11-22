@@ -3,7 +3,7 @@
 # @raycast.title Open URL
 # @raycast.mode compact
 # @raycast.packageName Browser
-# @raycast.argument1 {"type":"text","placeholder":"name or URL","optional":true}
+# @raycast.argument1 {"type":"text","placeholder":"name [values] or URL","optional":true}
 # @raycast.argument2 {"type":"text","placeholder":"profile","optional":true}
 osascript -l JavaScript - "$1" "$2" "$(pbpaste|head -c 2000|head -1)" "$(cat ~/.config/open-url/links.txt 2>/dev/null)" "$(lsappinfo visibleProcessList)" \
  "$(plutil -extract profile.info_cache json -o - ~/Library/Application\ Support/Google/Chrome/Local\ State 2>/dev/null)" <<'JS'
@@ -11,9 +11,18 @@ function norm(u){var m=/^([\w+.-]+:\/\/[^\/?#]*)?([^?#]*)([^#]*)(#.*)?/.exec(u),
 return(m[1]||'').toLowerCase().replace(/^(http:.*):80$|^(https:.*):443$/,'$1$2')+m[2].replace(/\/$/,'')+m[3]+(/^#[\w.-]*$/.test(f)?'':f)}
 function url(a){var m=/^((([\w-]+\.)*localhost|([\w-]+\.)+local|\d{1,3}(\.\d{1,3}){3})|([\w-]+\.)+(?!(txt|md|json|js|ts|py|sh|log|csv)\b)[a-z]{2,})(:\d+)?([\/?#]\S*)?$/i.exec(a)
 return/^https?:\/\/[^\s\/?#]\S*$/i.test(a)?a:m?'http'+(m[2]?'':'s')+'://'+a:''}
-function target(a,p,t){for(var l of t.split('\n')){var f=l.replace(/(^|\s)#.*/,'').trim().split(/\s+/)
-if(f[1]&&f[0].toLowerCase()==a.toLowerCase()){a=f[1];p=p||f.slice(2).join(' ');break}}
-return(a=url(a))?[a,p]:'ERR not a URL'}
+function target(a,p,t){var L=Object.create(null),w=a.split(/\s+/),v=w.slice(1),n=0,q=0,b='',r=''
+for(var l of t.split('\n')){var f=l.replace(/(^|\s)#.*/,'').trim().split(/\s+/),k=f[0].toLowerCase()
+if(f[1]&&!(k in L))L[k]=[f[1],f.slice(2).join(' ')]}
+var e=L[w[0].toLowerCase()]
+if(!e)return v[0]?'ERR not a URL':(a=url(a))?[a,p]:'ERR not a URL'
+var x=(s,d)=>s.replace(/\{([\w.-]*)\}/g,(m,k)=>{if(!k)k=String(++q)
+if(/^\d+$/.test(k))return n=Math.max(n,+k),v[k-1]||m
+var c=L[k.toLowerCase()];if(!c||d>4)return b=b||'ERR '+(c?'links nested too deep at {'+k+'}':'no link {'+k+'}'),m
+r=r||c[1];return x(c[0],d+1)})
+a=x(e[0],0);if(b)return b
+if(n!=v.length)return'ERR '+w[0]+(n?' needs '+n+' value'+(n>1?'s':''):' takes no values')
+return(a=url(a))?[a,p||e[1]||r]:'ERR not a URL'}
 var names=t=>Object.entries(JSON.parse(t||'{}')).map(([f,c])=>[f,c.name||f,c.gaia_name,c.gaia_given_name])
 var nz=s=>(s||'').normalize('NFKC').replace(/[\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/g,'').replace(/[\u2010-\u2015\u2212]/g,'-').replace(/\s+/g,' ').trim().toLowerCase(),folder=(N,p,k=N.filter(r=>r.some(x=>x&&nz(x)==nz(p))))=>k[1]?'':k[0]
 var R=/^(?:(.*) )?- google chrome(?: - (.+))?$/

@@ -9,3 +9,13 @@ docs https://docs.example.com/home # the team's docs
 wiki https://wiki.example.com/a#top Work	# a tab before the comment
 frag https://example.com/page#section
 dev localhost:3000/app Test #local
+# shared parts and values
+base https://console.example.com Work
+fn {base}/fn/home?r=x#/functions/{}
+logs {base}/cw/home?r=x#logs:group/{1}/stream/{2}
+own {base}/a Test
+part example.com
+host {part}/p
+deep1 {deep2}/x
+deep2 {deep1}/y
+miss {nope}/x
