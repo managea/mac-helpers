@@ -61,10 +61,26 @@ if [[ $safe == $sid && -d ${turn:h} && $state == RUNNING ]]; then : > $turn 2>/d
 if [[ $state == DONE && $safe == $sid && -e $turn ]]; then
   cwd=$(print -r -- "$payload" | jq -r '.cwd // empty | strings' 2>/dev/null)
   [[ -n $cwd ]] || cwd=$(sed -n '/^cwd:/{s/^cwd:[[:space:]]*//;s/[[:space:]]*$//;p;q;}' $yaml 2>/dev/null)
-  setopt local_options null_glob
   files=()
-  for runs in ${(s.:.)AGENT_STATUS_RUNS}; do files+=($runs/$name.status(N)); done
-  [[ -n $cwd && $cwd == /* ]] && files+=($cwd/runs/$name.status(N) $cwd/*/runs/$name.status(N) $cwd/*/*/runs/$name.status(N))
+  for runs in ${(s.:.)AGENT_STATUS_RUNS}; do files+=($runs/$name.status); done
+  # In the session's folder only folders are tried, smallest first, at most 2,000 at each level, and about 10,000
+  # entries are read in all: a folder's size says how many it holds without reading it (APFS gives 32 bytes an entry).
+  # So a folder with many entries never slows a turn; a glob such as $cwd/*/*/runs opens every entry two levels down.
+  if [[ $cwd == /* ]]; then
+    zmodload -F zsh/stat b:zstat 2>/dev/null
+    files+=($cwd/runs/$name.status)
+    budget=320000 left=2000 outer=()
+    zstat -A size +size -- $cwd 2>/dev/null && (( size[1] <= budget )) &&
+      { outer=($cwd/*(N-/oLY$left)); (( budget -= size[1] )) }
+    files+=(${^outer}/runs/$name.status)
+    for d in $outer; do
+      (( left > 0 )) || break
+      zstat -A size +size -- $d 2>/dev/null && (( size[1] <= budget )) || continue
+      inner=($d/*(N-/oLY$left))
+      files+=(${^inner}/runs/$name.status)
+      (( budget -= size[1], left -= $#inner ))
+    done
+  fi
   for file in $files; do
     [[ -f $file && $file -nt $turn ]] || continue
     said=$(head -c 200 $file 2>/dev/null | head -n 1 | tr '[:lower:]' '[:upper:]' | tr -s ' \t_' '-')

@@ -219,6 +219,28 @@ check "a folder of that name" "$(last)" DONE
 for i in {1..50}; do (( $(/usr/bin/grep -c . $tmp/notified3 2>/dev/null) >= 12 )) && break; sleep 0.1; done
 check "notified" "$(sort -u $tmp/notified3 | tr '\n' ',')" "wp3-build DONE,wp3-build PLAN-READY,wp3-build REVIEW-PASS,wp3-build STOP,wp3-build WAITING,wp3-build WAITING-REVIEW,"
 
+# Folders with many entries: folders only, smallest first, at most 2,000 at each level, about 10,000 entries read.
+# In c, aaa (2,100 folders) takes the 2,000 before zzz (2,100 files and x) is read; notes, the smallest, comes first.
+# In b, data (10,500 files and x) is past what is read; b/data as the session's folder is not read either.
+sb=eeee5555-0000-4000-8000-000000000005
+bw=$tmp/bw
+mkdir -p $HOME/.copilot/session-state/$sb $bw/c/aaa/d{1..2100} $bw/{b,c}/notes/wip/runs $bw/c/zzz/x/runs \
+  $bw/b/data/{x,}/runs
+: > $bw/c/zzz/f{1..2100}
+: > $bw/b/data/f{1..10500}
+printf 'id: %s\ncwd: %s\nname: big\n' $sb $bw/c > $HOME/.copilot/session-state/$sb/workspace.yaml
+big() { # big FOLDER FILE STATE: what a turn in FOLDER says when FILE (below it) says STATE
+  hook userPromptSubmitted "{\"sessionId\":\"$sb\"}" >/dev/null; sleep 0.05; print -r -- $3 > $bw/$1/$2
+  hook agentStop "{\"sessionId\":\"$sb\",\"cwd\":\"$bw/$1\"}" >/dev/null; rm $bw/$1/$2
+  lines | /usr/bin/grep '^big ' | tail -1 | /usr/bin/awk '{ print $2 }'
+}
+check "smallest first" "$(big c notes/wip/runs/big.status 'PLAN READY')" PLAN-READY
+check "2,000 two levels down" "$(big c zzz/x/runs/big.status STOP)" DONE
+check "many entries, beside" "$(big b notes/wip/runs/big.status WAITING)" WAITING
+check "many entries, not read" "$(big b data/x/runs/big.status STOP)" DONE
+check "many entries, its runs" "$(big b/data runs/big.status 'REVIEW PASS')" REVIEW-PASS
+check "many entries, below it" "$(big b/data x/runs/big.status STOP)" DONE
+
 # notify-done: the command's output and exit code kept, a line and a notification for each way it can end.
 mine=$tmp/notified2
 print -r -- "#!/bin/zsh
