@@ -4,7 +4,8 @@
 # session's state gets (cpsig). The command's own output and exit code are kept: notify-done npm-test npm test && ...
 #   notify-done jest npx jest src/cart.test.ts
 # A pipe or a redirect belongs to the whole line: notify-done jest npx jest a > /tmp/j.txt 2>&1 (its last line,
-# notify-done jest: EXIT 0, goes there too). Ctrl+C is reported as FAILED with exit code 130.
+# notify-done jest: EXIT 0, goes there too). Ctrl+C is reported as FAILED with exit code 130, SIGTERM with 143 and
+# SIGHUP (the terminal closed) with 129; either one sent to this script alone is passed on to the command first.
 # NAME: letters, digits, . _ -, at most 40 characters. AGENT_STATUS_NOTIFY and COPILOT_HOME as for agent-status.sh.
 PATH=$PATH:/usr/bin:/bin:/opt/homebrew/bin:/usr/local/bin
 if (( $# < 2 )) || [[ ! $1 =~ '^[A-Za-z0-9._-]{1,40}$' ]]; then
@@ -13,10 +14,22 @@ if (( $# < 2 )) || [[ ! $1 =~ '^[A-Za-z0-9._-]{1,40}$' ]]; then
 fi
 name=$1
 shift
-trap : INT   # the command gets Ctrl+C too; this script lives on to report it
+# The command gets Ctrl+C, and a hangup when the terminal closes, too; this script lives on to report how it ended. A
+# SIGTERM or SIGHUP sent to this script alone goes on to the command at once (traps_async), so it ends the same way.
+# The command's process ids come from $jobstates, and the trap uses builtins only: a trap that starts a process while
+# the command ends loses the command's exit code.
+zmodload zsh/parameter 2>/dev/null
+setopt traps_async
+pass_on() {
+  local job pid
+  for job in ${(v)jobstates}; do for pid in ${${(M)${(s.:.)job}:#*=*}%%=*}; do kill -$1 $pid 2>/dev/null; done; done
+}
+trap : INT
+trap 'pass_on TERM' TERM
+trap 'pass_on HUP' HUP
 "$@"
 code=$?
-trap - INT
+trap : INT TERM HUP   # from here on a signal no longer cuts the report short
 state=DONE
 (( code )) && state=FAILED
 dir=${COPILOT_HOME:-$HOME/.copilot}

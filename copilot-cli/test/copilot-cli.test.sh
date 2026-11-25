@@ -248,6 +248,21 @@ done
 check "nd no arguments" "$(nd only 2>/dev/null)" "code 2"
 check "nd nobody to tell" "$(AGENT_STATUS_NOTIFY= COPILOT_HOME=$tmp/nd2 zsh $tools/notify-done q true; print $?)" "notify-done q: EXIT 0
 0"
+# SIGTERM or SIGHUP sent to notify-done alone: passed on, so the command ends at once, and reported like Ctrl+C.
+for sig code in TERM 143 HUP 129; do
+  AGENT_STATUS_NOTIFY=$tmp/notify2 COPILOT_HOME=$tmp/nd zsh $tools/notify-done sig-$sig sleep 30 > $tmp/nd-$sig 2>&1 &
+  ndpid=$! child=
+  for i in {1..50}; do child=$(pgrep -P $ndpid sleep) && break; sleep 0.1; done
+  kill -$sig $ndpid; wait $ndpid
+  check "nd $sig" "$? $(<$tmp/nd-$sig)" "$code notify-done sig-$sig: EXIT $code"
+  check "nd $sig ends the command" "${child:+started} $(kill -0 $child 2>/dev/null && print running || print ended)" \
+    "started ended"
+done
+check "nd signals" "$(/usr/bin/sed -E 's/^[0-9:]{8}  //' $tmp/nd/agent-status.log | tail -2; tail -2 $mine)" \
+  "sig-TERM  FAILED  exit-143
+sig-HUP  FAILED  exit-129
+sig-TERM FAILED
+sig-HUP FAILED"
 
 # cplog: the last lines, then what is added, until it is ended.
 mkdir -p $tmp/cl && print -l one two three > $tmp/cl/agent-status.log

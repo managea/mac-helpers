@@ -78,7 +78,9 @@ notify-done jest npx jest src/cart.test.ts
 notify-done jest npx jest src/cart.test.ts > /tmp/j.txt 2>&1
 ```
 
-Its last line is `notify-done NAME: EXIT n`. Ctrl+C ends the command and is reported as `FAILED` with exit code 130.
+Its last line is `notify-done NAME: EXIT n`. Ctrl+C ends the command and is reported as `FAILED` with exit code 130;
+SIGTERM and SIGHUP (the terminal closed) the same way, with 143 and 129. Sent to `notify-done` alone, they are passed on
+to the command.
 `AGENT_STATUS_NOTIFY` and `$COPILOT_HOME` hold here as for the hook.
 
 ## cpstatus and cpchat
