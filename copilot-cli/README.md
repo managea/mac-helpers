@@ -37,12 +37,18 @@ Then start the Copilot CLI again: it loads hooks and agents when it starts (`/en
 | `NEEDS-PERMISSION` | a tool, path or URL waits for approval |
 | `IDLE` | the agent waits for input |
 | `DONE` | the agent stopped (agentStop, or the agent_completed notification) |
+| `PLAN-READY`, `WAITING`, `WAITING-REVIEW`, `REVIEW-PASS`, `STOP` | the agent stopped, and its status file says so (below) |
 | `CONTEXT-80` | the CLI is about to compact the conversation (it does so at about 80% of the context) |
 | `ERROR`, `ENDED` | an error; the session ended |
 
 - The name is the session's name (`/rename NAME`, or `copilot -n NAME`) in printable ASCII with spaces as underscores,
   at most 40 characters; without one, the first 8 characters of the session id. A subagent's run (a reviewer, say)
   logs under its own id. Give every session its own name before running several.
+- **A status file:** a session that stops for a decision (the `supervised-builder` agent) keeps one line in
+  `NAME.status`, NAME being the session's name. When a turn ends and that file was written in this turn, its first words
+  are the state instead of `DONE`: `PLAN READY`, `WAITING ...`, `WAITING REVIEW`, `REVIEW PASS` or `STOP`; nothing after
+  them is written anywhere. It is looked for in `runs`, `*/runs` and `*/*/runs` of the session's folder, and in the
+  folders of `AGENT_STATUS_RUNS` (separated by colons). So give the run log, and with it the status file, the session's name.
 - A state repeated for the same session is written once. The detail is the event or notification type, never prompt,
   reply or tool text. The script takes about 0.1 s and always exits 0, so it never stops a session.
 - Declining a permission ends the turn without agentStop, so the log keeps `NEEDS-PERMISSION` until the next prompt.
@@ -50,7 +56,7 @@ Then start the Copilot CLI again: it loads hooks and agents when it starts (`/en
 
 ## cpsig: a notification when a session wants attention
 
-When the hook writes a new `DONE`, `QUESTION`, `NEEDS-PERMISSION` or `ERROR` line it also starts `~/bin/cpsig NAME
+When the hook writes a new `DONE`, `QUESTION`, `NEEDS-PERMISSION` or `ERROR` line, or one of a status file, it also starts `~/bin/cpsig NAME
 STATE` in the background (the session does not wait for it): a macOS notification titled `CPSIG` that reads, say,
 `build-api DONE`. It stays in Notification Centre until closed, so it is seen even when the log is not watched.
 

@@ -182,6 +182,43 @@ check "cpsig args" "${args##* -- }" 'say "hi" & x DONE'
 check "cpsig title" "$(print -r -- $args | /usr/bin/grep -c 'with title "CPSIG"')" 1
 check "cpsig no osascript" "$(PATH=$tmp/nobin /bin/zsh -f $tools/cpsig a b 2>&1; print $?)" 0
 
+# The status file: what it says in place of DONE, only when written in this turn, only for the session's own name.
+sp=dddd4444-0000-4000-8000-000000000004
+pr=$tmp/ws
+mkdir -p $HOME/.copilot/session-state/$sp $pr/notes/wip/runs $pr/runs $tmp/elsewhere
+printf 'id: %s\ncwd: %s\nname: wp3-build\n' $sp $pr > $HOME/.copilot/session-state/$sp/workspace.yaml
+export AGENT_STATUS_NOTIFY=$tmp/notify3 && print -r -- "#!/bin/zsh
+print -r -- \"\$1 \$2\" >> $tmp/notified3" > $tmp/notify3 && chmod 755 $tmp/notify3
+turn() { hook userPromptSubmitted "{\"sessionId\":\"$sp\"}" >/dev/null; sleep 0.05; }
+ends() { hook agentStop "{\"sessionId\":\"$sp\",\"cwd\":\"$pr\"}" >/dev/null; hook notification "{\"sessionId\":\"$sp\",\"notification_type\":\"agent_completed\"}" >/dev/null; }
+last() { lines | /usr/bin/grep '^wp3-build ' | tail -1 | /usr/bin/awk '{ print $2 }'; }
+f=$pr/notes/wip/runs/wp3-build.status
+said() { turn; print -r -- "$1" > $f; ends; last; }
+check "plan ready" "$(said 'PLAN READY')" PLAN-READY
+check "plan ready once" "$(lines | /usr/bin/grep -c '^wp3-build  PLAN-READY')" 1
+check "waiting review" "$(said 'waiting review: round 2')" WAITING-REVIEW
+check "waiting" "$(said 'WAITING which table holds it?')" WAITING
+check "no text written" "$(/usr/bin/grep -c 'table' $log)" 0
+check "review pass" "$(said 'REVIEW PASS')" REVIEW-PASS
+check "stop" "$(said 'STOP')" STOP
+check "done" "$(said 'DONE')" DONE
+check "running" "$(said 'RUNNING')" DONE
+check "other words" "$(said 'planning something')" DONE
+print 'PLAN READY' > $f; sleep 0.05; turn; ends
+check "an older file says nothing" "$(last)" DONE
+rm $f; turn; print 'PLAN READY' > $pr/notes/wip/runs/other.status; ends
+check "another session's file" "$(last)" DONE
+turn; print 'PLAN READY' > $tmp/elsewhere/wp3-build.status; ends
+check "a folder it does not look in" "$(last)" DONE
+turn; print 'PLAN READY' > $tmp/elsewhere/wp3-build.status; export AGENT_STATUS_RUNS=/nowhere:$tmp/elsewhere; ends; unset AGENT_STATUS_RUNS
+check "AGENT_STATUS_RUNS" "$(last)" PLAN-READY
+turn; print 'STOP' > $pr/runs/wp3-build.status; hook agentStop "{\"sessionId\":\"$sp\"}" >/dev/null
+check "the folder from workspace.yaml" "$(last)" STOP
+turn; mkdir $pr/notes/wip/runs/wp3-build.status; rm $pr/runs/wp3-build.status; ends
+check "a folder of that name" "$(last)" DONE
+for i in {1..50}; do (( $(/usr/bin/grep -c . $tmp/notified3 2>/dev/null) >= 12 )) && break; sleep 0.1; done
+check "notified" "$(sort -u $tmp/notified3 | tr '\n' ',')" "wp3-build DONE,wp3-build PLAN-READY,wp3-build REVIEW-PASS,wp3-build STOP,wp3-build WAITING,wp3-build WAITING-REVIEW,"
+
 # notify-done: the command's output and exit code kept, a line and a notification for each way it can end.
 mine=$tmp/notified2
 print -r -- "#!/bin/zsh

@@ -3,7 +3,7 @@
 #   HH:MM:SS  NAME  STATE  detail
 # Called as `agent-status.sh EVENT` with the hook's JSON on stdin (agent-status.json). It never writes prompt, reply
 # or tool text, takes about 0.02 s and always exits 0, so a failure here never stops a session. A new DONE, QUESTION,
-# NEEDS-PERMISSION or ERROR line also starts ~/bin/cpsig NAME STATE (a desktop notification) in the background, when it
+# NEEDS-PERMISSION, ERROR, PLAN-READY, WAITING, WAITING-REVIEW, REVIEW-PASS or STOP line also starts ~/bin/cpsig NAME STATE (a desktop notification) in the background, when it
 # is there; AGENT_STATUS_NOTIFY names another program, or turns that off when set but empty.
 # The CLI's folder is $COPILOT_HOME when set, else ~/.copilot. Tools are found on PATH, with the system folders added
 # for a hook started with a short one.
@@ -52,6 +52,33 @@ name=${name[1,40]}
 [[ -n $name && $name != null ]] || name=${safe[1,8]}
 [[ -n $name ]] || exit 0
 
+# A turn that ends says DONE, unless the session keeps a status file that says otherwise: NAME.status, one line, in a
+# runs folder of the session's folder or up to two folders below it (runs, */runs, */*/runs), or in a folder of
+# $AGENT_STATUS_RUNS (separated by colons). Only its first words are taken, as one of the states below, and only when it
+# was written in this turn: a prompt leaves a mark in the session's own folder, and an older file says nothing.
+turn=$dir/session-state/$sid/.agent-status-turn
+if [[ $safe == $sid && -d ${turn:h} && $state == RUNNING ]]; then : > $turn 2>/dev/null; fi
+if [[ $state == DONE && $safe == $sid && -e $turn ]]; then
+  cwd=$(print -r -- "$payload" | jq -r '.cwd // empty | strings' 2>/dev/null)
+  [[ -n $cwd ]] || cwd=$(sed -n '/^cwd:/{s/^cwd:[[:space:]]*//;s/[[:space:]]*$//;p;q;}' $yaml 2>/dev/null)
+  setopt local_options null_glob
+  files=()
+  for runs in ${(s.:.)AGENT_STATUS_RUNS}; do files+=($runs/$name.status(N)); done
+  [[ -n $cwd && $cwd == /* ]] && files+=($cwd/runs/$name.status(N) $cwd/*/runs/$name.status(N) $cwd/*/*/runs/$name.status(N))
+  for file in $files; do
+    [[ -f $file && $file -nt $turn ]] || continue
+    said=$(head -c 200 $file 2>/dev/null | head -n 1 | tr '[:lower:]' '[:upper:]' | tr -s ' \t_' '-')
+    case $said in
+      PLAN-READY*) state=PLAN-READY ;;
+      WAITING-REVIEW*) state=WAITING-REVIEW ;;
+      WAITING*) state=WAITING ;;
+      REVIEW-PASS*) state=REVIEW-PASS ;;
+      STOP*) state=STOP ;;
+    esac
+    break
+  done
+fi
+
 # A state repeated for the same session (agentStop and agent_completed both mean DONE) is written once.
 mkdir -p $dir 2>/dev/null
 last=$(tail -n 200 $log 2>/dev/null | N=$name awk '$2 == ENVIRON["N"] { s = $3 } END { print s }')
@@ -60,7 +87,7 @@ if { print -r -- "$(date +%H:%M:%S)  $name  $state  $detail" >> $log } 2>/dev/nu
   # A state that wants someone's attention: a notification, started in the background so the session never waits.
   notify=${AGENT_STATUS_NOTIFY-$HOME/bin/cpsig}
   case $state in
-    DONE|QUESTION|NEEDS-PERMISSION|ERROR)
+    DONE|QUESTION|NEEDS-PERMISSION|ERROR|PLAN-READY|WAITING|WAITING-REVIEW|REVIEW-PASS|STOP)
       [[ -n $notify && -x $notify ]] && "$notify" "$name" "$state" </dev/null >/dev/null 2>&1 & ;;
   esac
 fi
