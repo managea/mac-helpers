@@ -45,9 +45,9 @@ Then start the Copilot CLI again: it loads hooks and agents when it starts (`/en
   at most 40 characters; without one, the first 8 characters of the session id. A subagent's run (a reviewer, say)
   logs under its own id. Give every session its own name before running several.
 - **A status file:** a session that stops for a decision (the `supervised-builder` agent) keeps one line in
-  `NAME.status`, NAME being the session's name. When a turn ends and that file was written in this turn, its first words
-  are the state instead of `DONE`: `PLAN READY`, `WAITING ...`, `WAITING REVIEW`, `REVIEW PASS` or `STOP`; nothing after
-  them is written anywhere. It is looked for in `runs`, `*/runs` and `*/*/runs` of the session's folder, and in the
+  `NAME.status`, NAME being the session's name (a name with `/` has none). When a turn ends and that file was written
+  in this turn, its first words are the state instead of `DONE`: `PLAN READY`, `WAITING ...`, `WAITING REVIEW`,
+  `REVIEW PASS` or `STOP`; nothing after them is written anywhere. It is looked for in `runs`, `*/runs` and `*/*/runs` of the session's folder, and in the
   folders of `AGENT_STATUS_RUNS` (separated by colons). So give the run log, and with it the status file, the session's name.
   In the session's folder only folders are tried, smallest first, at most 2,000 at each level, and about 10,000 entries
   are read in all, so a folder with many entries never slows a turn; a status file that is left out that way (below a

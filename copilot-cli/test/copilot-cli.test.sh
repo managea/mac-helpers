@@ -279,6 +279,18 @@ check "a live lock" "$before $(lines | /usr/bin/grep -c '^ffff0031 ')" "0 1"
 locks=($HOME/.copilot/session-state/*/.agent-status-lock(N) $HOME/.copilot/.agent-status-lock-*(N))
 check "no lock left" "$locks" ""
 
+# A name with / has no status file: NAME.status would lead out of the runs folders.
+sl=ffff0040-0000-4000-8000-000000000040
+mkdir -p $HOME/.copilot/session-state/$sl $tmp/sl/p/runs/feature $tmp/sl/outside
+slash() { # slash NAME FILE: what a turn says when FILE says STOP
+  printf 'id: %s\ncwd: %s\nname: %s\n' $sl $tmp/sl/p "$1" > $HOME/.copilot/session-state/$sl/workspace.yaml
+  hook userPromptSubmitted "{\"sessionId\":\"$sl\"}" >/dev/null; sleep 0.05; print STOP > $2
+  hook agentStop "{\"sessionId\":\"$sl\"}" >/dev/null; rm $2
+  lines | tail -1 | /usr/bin/awk '{ print $1, $2 }'
+}
+check "a name with /" "$(slash feature/login $tmp/sl/p/runs/feature/login.status)" "feature/login DONE"
+check "a name with ../" "$(slash ../../outside/x $tmp/sl/outside/x.status)" "../../outside/x DONE"
+
 # notify-done: the command's output and exit code kept, a line and a notification for each way it can end.
 mine=$tmp/notified2
 print -r -- "#!/bin/zsh

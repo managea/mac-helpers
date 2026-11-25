@@ -69,7 +69,8 @@ done
 # A turn that ends says DONE, unless the session keeps a status file that says otherwise: NAME.status, one line, in a
 # runs folder of the session's folder or up to two folders below it (runs, */runs, */*/runs), or in a folder of
 # $AGENT_STATUS_RUNS (separated by colons). Only its first words are taken, as one of the states below, and only when it
-# was written in this turn: a prompt leaves a mark in the session's own folder, and an older file says nothing.
+# was written in this turn: a prompt leaves a mark in the session's own folder, and an older file says nothing. A name
+# with a / has none: NAME.status would be a path that leads out of the runs folders.
 turn=$dir/session-state/$sid/.agent-status-turn
 if [[ $safe == $sid && -d ${turn:h} && $state == RUNNING ]]; then : > $turn 2>/dev/null; fi
 # agentStop and agent_completed both end a turn, and the notification names no folder: the first of them decides and
@@ -78,7 +79,7 @@ kept=
 [[ $state == DONE && $safe == $sid && -f $turn ]] && { read -r kept < $turn } 2>/dev/null
 if [[ $kept == (DONE|PLAN-READY|WAITING|WAITING-REVIEW|REVIEW-PASS|STOP) ]]; then
   state=$kept
-elif [[ $state == DONE && $safe == $sid && -f $turn ]]; then
+elif [[ $state == DONE && $safe == $sid && -f $turn && $name != */* ]]; then
   cwd=$(print -r -- "$payload" | jq -r '.cwd // empty | strings' 2>/dev/null)
   [[ -n $cwd ]] || cwd=$(sed -n '/^cwd:/{s/^cwd:[[:space:]]*//;s/[[:space:]]*$//;p;q;}' $yaml 2>/dev/null)
   files=()
