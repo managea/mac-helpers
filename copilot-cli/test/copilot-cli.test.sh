@@ -16,6 +16,13 @@ check() { # check NAME ACTUAL EXPECTED
 hook() { print -r -- "$2" | zsh $tools/agent-status.sh $1; print $?; }
 log=$HOME/.copilot/agent-status.log
 lines() { [[ -r $log ]] && /usr/bin/sed -E 's/^[0-9]{2}:[0-9]{2}:[0-9]{2}  //' $log; }
+# A stand-in for cpsig, so no real notification shows: each call the hook starts adds a "NAME STATE" line. The hook
+# starts it in the background, so settle N waits until N lines are there (5 s at most).
+notified=$tmp/notified
+print -r -- "#!/bin/zsh
+print -r -- \"\$1 \$2\" >> $notified" > $tmp/notify && chmod 755 $tmp/notify
+export AGENT_STATUS_NOTIFY=$tmp/notify
+settle() { local i; for i in {1..50}; do (( $(cat $notified 2>/dev/null | wc -l) >= $1 )) && break; sleep 0.1; done; sleep 0.2; }
 
 # Sessions: a named one in a project folder, one with a long name, one without a workspace.yaml.
 s1=aaaa1111-0000-4000-8000-000000000001
@@ -48,6 +55,12 @@ cccc3333  CONTEXT-80  preCompact
 cccc3333  ERROR  errorOccurred
 cccc3333  IDLE  agent_idle
 cccc3333  ENDED  sessionEnd"
+# A notification for each new state that wants attention, none for the rest or for the repeated DONE.
+settle 4
+check notified "$(LC_ALL=C sort $notified)" "Build_API DONE
+Build_API QUESTION
+a-very-long-session-name-that-goes-past- NEEDS-PERMISSION
+cccc3333 ERROR"
 check "time shape" "$(/usr/bin/grep -cvE '^[0-9]{2}:[0-9]{2}:[0-9]{2}  [^ ]+  [A-Z0-9-]+  [a-z_A-Z]+$' $log)" 0
 check "no prompt text" "$(/usr/bin/grep -c private $log)" 0
 before=$(wc -l < $log)
@@ -121,11 +134,11 @@ check "cpchat bad N" "$(zsh $tools/cpchat Build_API x 2>&1; print $?)" "cpchat: 
 bin=$tmp/bin
 out=$(zsh $tools/install.sh $bin)
 check install "$(print -r -- $out | /usr/bin/awk '{ print $1 }' | sort | uniq -c | /usr/bin/awk '{ print $1, $2 }')" "1 Start
-5 copied
+7 copied
 1 note:"
-check "install check" "$(zsh $tools/install.sh --check $bin | /usr/bin/awk '{ print $1 }' | sort | uniq -c | /usr/bin/awk '{ print $1, $2 }'; print $?)" "5 same
+check "install check" "$(zsh $tools/install.sh --check $bin | /usr/bin/awk '{ print $1 }' | sort | uniq -c | /usr/bin/awk '{ print $1, $2 }'; print $?)" "7 same
 0"
-[[ -x $bin/cpchat && -x $HOME/.copilot/hooks/agent-status.sh ]] || { print -u2 "FAIL install modes"; fails=$((fails + 1)); }
+[[ -x $bin/cpchat && -x $bin/cpsig && -x $bin/notify-done && -x $HOME/.copilot/hooks/agent-status.sh ]] || { print -u2 "FAIL install modes"; fails=$((fails + 1)); }
 print changed >> $bin/cpstatus
 check "install check differs" "$(zsh $tools/install.sh --check $bin | /usr/bin/grep -c differs; print ${pipestatus[1]})" "1
 1"
@@ -147,5 +160,56 @@ check "hook command" "$(/usr/bin/tail -1 "$alt/agent-status.log" | /usr/bin/sed 
 # A hook started with an empty PATH still finds its tools.
 print -r -- "{\"sessionId\":\"$s1\"}" | /usr/bin/env -i HOME=$HOME /bin/zsh -f $tools/agent-status.sh errorOccurred
 check "empty PATH" "$(lines | tail -1)" "Build_API  ERROR  errorOccurred"
+
+# Notifications: the run with HOME moved (its log folder is created, so it writes) and the COPILOT_HOME run above added
+# one each (6 in all); none when AGENT_STATUS_NOTIFY is set but empty, and a missing program changes nothing (the hook
+# still exits 0). The empty-PATH run had no AGENT_STATUS_NOTIFY and no ~/bin/cpsig, so it started nothing.
+settle 6
+check "notify count" "$(wc -l < $notified | /usr/bin/tr -d ' ')" 6
+check "notify off" "$(AGENT_STATUS_NOTIFY= hook agentStop "{\"sessionId\":\"$s3\"}")" 0
+check "notify missing" "$(AGENT_STATUS_NOTIFY=$tmp/none hook errorOccurred "{\"sessionId\":\"$s2\"}")" 0
+sleep 0.5
+check "notify none" "$(wc -l < $notified | /usr/bin/tr -d ' ')" 6
+
+# cpsig: osascript gets the name and state as arguments after --, so quotes in a name stay text; without osascript
+# on PATH it does nothing. A stand-in osascript records its arguments; no real notification shows.
+mkdir -p $tmp/fakebin $tmp/nobin
+print -r -- "#!/bin/zsh
+print -r -- \"\$@\" > $tmp/osa-args" > $tmp/fakebin/osascript && chmod 755 $tmp/fakebin/osascript
+check "cpsig exit" "$(PATH=$tmp/fakebin:/usr/bin:/bin /bin/zsh -f $tools/cpsig 'say "hi" & x' DONE; print $?)" 0
+args=$(<$tmp/osa-args)
+check "cpsig args" "${args##* -- }" 'say "hi" & x DONE'
+check "cpsig title" "$(print -r -- $args | /usr/bin/grep -c 'with title "CPSIG"')" 1
+check "cpsig no osascript" "$(PATH=$tmp/nobin /bin/zsh -f $tools/cpsig a b 2>&1; print $?)" 0
+
+# notify-done: the command's output and exit code kept, a line and a notification for each way it can end.
+mine=$tmp/notified2
+print -r -- "#!/bin/zsh
+print -r -- \"\$1 \$2\" >> $mine" > $tmp/notify2 && chmod 755 $tmp/notify2
+nd() { AGENT_STATUS_NOTIFY=$tmp/notify2 COPILOT_HOME=$tmp/nd zsh $tools/notify-done "$@"; print "code $?"; }
+check "nd ok" "$(nd ok print -r -- 'a  b' 2>&1)" "a  b
+notify-done ok: EXIT 0
+code 0"
+check "nd fails" "$(nd bad zsh -c 'print out; exit 3' 2>&1)" "out
+notify-done bad: EXIT 3
+code 3"
+check "nd no command" "$(nd gone no-such-command-here 2>/dev/null)" "notify-done gone: EXIT 127
+code 127"
+check "nd ctrl-c" "$(nd stop zsh -c 'kill -INT $$' 2>/dev/null)" "notify-done stop: EXIT 130
+code 130"
+check "nd notified" "$(<$mine)" "ok DONE
+bad FAILED
+gone FAILED
+stop FAILED"
+check "nd log" "$(/usr/bin/sed -E 's/^[0-9]{2}:[0-9]{2}:[0-9]{2}  //' $tmp/nd/agent-status.log)" "ok  DONE  exit-0
+bad  FAILED  exit-3
+gone  FAILED  exit-127
+stop  FAILED  exit-130"
+for bad in "" "two words" 'a;b' "$(printf 'x%.0s' {1..41})"; do
+  check "nd name ${bad[1,9]}" "$(nd "$bad" print never 2>/dev/null)" "code 2"
+done
+check "nd no arguments" "$(nd only 2>/dev/null)" "code 2"
+check "nd nobody to tell" "$(AGENT_STATUS_NOTIFY= COPILOT_HOME=$tmp/nd2 zsh $tools/notify-done q true; print $?)" "notify-done q: EXIT 0
+0"
 
 (( fails == 0 )) && print "copilot-cli OK" || { print -u2 "$fails failed"; exit 1; }

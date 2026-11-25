@@ -1,0 +1,10 @@
+#!/bin/zsh
+# cpsig NAME STATE: a desktop notification titled CPSIG that reads "NAME STATE", for a session that wants attention.
+# agent-status.sh starts it for DONE, QUESTION, NEEDS-PERMISSION and ERROR. macOS only: without osascript it does
+# nothing. It always exits 0, so a notification that cannot be shown never stops the hook.
+# The text goes in as arguments, so a session name is never read as AppleScript.
+command -v osascript >/dev/null 2>&1 || exit 0
+osascript -e 'on run argv' \
+  -e 'display notification ((item 1 of argv) & " " & (item 2 of argv)) with title "CPSIG"' \
+  -e 'end run' -- "${1:-}" "${2:-}" >/dev/null 2>&1
+exit 0

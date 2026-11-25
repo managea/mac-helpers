@@ -1,0 +1,28 @@
+#!/bin/zsh
+# notify-done NAME COMMAND [ARG...]: runs the command and says when it has ended, for a test run or a build started by
+# hand: a line in agent-status.log (NAME DONE, or NAME FAILED with the exit code) and the same desktop notification a
+# session's state gets (cpsig). The command's own output and exit code are kept: notify-done npm-test npm test && ...
+#   notify-done jest npx jest src/cart.test.ts
+# A pipe or a redirect belongs to the whole line: notify-done jest npx jest a > /tmp/j.txt 2>&1 (its last line,
+# notify-done jest: EXIT 0, goes there too). Ctrl+C is reported as FAILED with exit code 130.
+# NAME: letters, digits, . _ -, at most 40 characters. AGENT_STATUS_NOTIFY and COPILOT_HOME as for agent-status.sh.
+PATH=$PATH:/usr/bin:/bin:/opt/homebrew/bin:/usr/local/bin
+if (( $# < 2 )) || [[ ! $1 =~ '^[A-Za-z0-9._-]{1,40}$' ]]; then
+  print -u2 "usage: notify-done NAME COMMAND [ARG...]   (NAME: letters, digits, . _ -, at most 40)"
+  exit 2
+fi
+name=$1
+shift
+trap : INT   # the command gets Ctrl+C too; this script lives on to report it
+"$@"
+code=$?
+trap - INT
+state=DONE
+(( code )) && state=FAILED
+dir=${COPILOT_HOME:-$HOME/.copilot}
+mkdir -p $dir 2>/dev/null
+{ print -r -- "$(date +%H:%M:%S)  $name  $state  exit-$code" >> $dir/agent-status.log } 2>/dev/null
+notify=${AGENT_STATUS_NOTIFY-$HOME/bin/cpsig}
+[[ -n $notify && -x $notify ]] && "$notify" "$name" "$state" </dev/null >/dev/null 2>&1
+print -r -- "notify-done $name: EXIT $code"
+exit $code

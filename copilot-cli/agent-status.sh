@@ -2,7 +2,9 @@
 # Copilot CLI hook: one line per session event in the CLI folder's agent-status.log, for whoever watches several sessions:
 #   HH:MM:SS  NAME  STATE  detail
 # Called as `agent-status.sh EVENT` with the hook's JSON on stdin (agent-status.json). It never writes prompt, reply
-# or tool text, takes about 0.02 s and always exits 0, so a failure here never stops a session.
+# or tool text, takes about 0.02 s and always exits 0, so a failure here never stops a session. A new DONE, QUESTION,
+# NEEDS-PERMISSION or ERROR line also starts ~/bin/cpsig NAME STATE (a desktop notification) in the background, when it
+# is there; AGENT_STATUS_NOTIFY names another program, or turns that off when set but empty.
 # The CLI's folder is $COPILOT_HOME when set, else ~/.copilot. Tools are found on PATH, with the system folders added
 # for a hook started with a short one.
 PATH=$PATH:/usr/bin:/bin:/opt/homebrew/bin:/usr/local/bin
@@ -54,5 +56,12 @@ name=${name[1,40]}
 mkdir -p $dir 2>/dev/null
 last=$(tail -n 200 $log 2>/dev/null | N=$name awk '$2 == ENVIRON["N"] { s = $3 } END { print s }')
 [[ $last == $state ]] && exit 0
-{ print -r -- "$(date +%H:%M:%S)  $name  $state  $detail" >> $log } 2>/dev/null
+if { print -r -- "$(date +%H:%M:%S)  $name  $state  $detail" >> $log } 2>/dev/null; then
+  # A state that wants someone's attention: a notification, started in the background so the session never waits.
+  notify=${AGENT_STATUS_NOTIFY-$HOME/bin/cpsig}
+  case $state in
+    DONE|QUESTION|NEEDS-PERMISSION|ERROR)
+      [[ -n $notify && -x $notify ]] && "$notify" "$name" "$state" </dev/null >/dev/null 2>&1 & ;;
+  esac
+fi
 exit 0

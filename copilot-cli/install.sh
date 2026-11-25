@@ -1,7 +1,8 @@
 #!/bin/zsh
 # Installs the Copilot CLI status tools for this user, by copying: the hook into the CLI's hooks folder, the
-# supervised-builder agent into its agents folder (both under $COPILOT_HOME when set, else ~/.copilot), cpstatus and
-# cpchat into ~/bin (or the folder given). Needs zsh and jq on PATH.
+# supervised-builder agent into its agents folder (both under $COPILOT_HOME when set, else ~/.copilot), cpstatus,
+# cpchat, cpsig and notify-done into ~/bin (or the folder given). Needs zsh and jq on PATH. The hook starts ~/bin/cpsig: with
+# another folder, set AGENT_STATUS_NOTIFY to its cpsig in the CLI's environment.
 #   install.sh [BIN]          copy, and say what was copied
 #   install.sh --check [BIN]  copy nothing; say for each file whether the installed copy is the same
 # The CLI loads hooks and agents when it starts: start it again afterwards. Nothing here uses the network.
@@ -10,9 +11,9 @@ check=0
 [[ $1 == --check ]] && { check=1; shift; }
 bin=${1:-$HOME/bin}
 home=${COPILOT_HOME:-$HOME/.copilot}
-names=(agent-status.sh agent-status.json supervised-builder.agent.md cpstatus cpchat)
-dests=($home/hooks $home/hooks $home/agents $bin $bin)
-modes=(755 644 644 755 755)
+names=(agent-status.sh agent-status.json supervised-builder.agent.md cpstatus cpchat cpsig notify-done)
+dests=($home/hooks $home/hooks $home/agents $bin $bin $bin $bin)
+modes=(755 644 644 755 755 755 755)
 differ=0
 for i in {1..${#names}}; do
   name=$names[i] dest=$dests[i] mode=$modes[i]

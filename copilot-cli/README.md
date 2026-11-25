@@ -1,9 +1,9 @@
 # Copilot CLI status tools
 
 Small tools for anyone running several GitHub Copilot CLI sessions at once and keeping an eye on them:
-a status log that every session writes to, a one-line overview per session, a session's conversation as text, and a
-custom agent that stops at each review round for its supervisor's decision. zsh and `jq` are all they use, and none
-of them uses the network.
+a status log that every session writes to, a desktop notification when a session wants attention or a command started
+by hand has ended, a one-line overview per session, a session's conversation as text, and a custom agent that stops at
+each review round for its supervisor's decision. zsh and `jq` are all they use, and none of them uses the network.
 
 ## Install
 
@@ -47,6 +47,33 @@ Then start the Copilot CLI again: it loads hooks and agents when it starts (`/en
   reply or tool text. The script takes about 0.1 s and always exits 0, so it never stops a session.
 - Declining a permission ends the turn without agentStop, so the log keeps `NEEDS-PERMISSION` until the next prompt.
 - `tail -n 15 -F ~/.copilot/agent-status.log` in a terminal split keeps the latest lines in sight.
+
+## cpsig: a notification when a session wants attention
+
+When the hook writes a new `DONE`, `QUESTION`, `NEEDS-PERMISSION` or `ERROR` line it also starts `~/bin/cpsig NAME
+STATE` in the background (the session does not wait for it): a macOS notification titled `CPSIG` that reads, say,
+`build-api DONE`. It stays in Notification Centre until closed, so it is seen even when the log is not watched.
+
+- A state repeated for the same session is not written again, so it does not notify again either.
+- `AGENT_STATUS_NOTIFY` in the CLI's environment names another program to start the same way (`NAME STATE` as its
+  arguments), or turns notifications off when it is set but empty. Set it to `BIN/cpsig` when `install.sh` was given
+  another folder.
+- Without `osascript` (not macOS) `cpsig` does nothing; it always exits 0. The name and state go to AppleScript as
+  arguments, never as script text.
+
+## notify-done: a notification when a command has ended
+
+`notify-done NAME COMMAND [ARG...]` runs the command, keeps its output and its exit code, and at the end adds a line to
+the status log (`NAME  DONE  exit-0`, or `NAME  FAILED  exit-1`) and shows the same notification: for a test run or a
+build in a terminal that is out of sight.
+
+```sh
+notify-done jest npx jest src/cart.test.ts
+notify-done jest npx jest src/cart.test.ts > /tmp/j.txt 2>&1
+```
+
+Its last line is `notify-done NAME: EXIT n`. Ctrl+C ends the command and is reported as `FAILED` with exit code 130.
+`AGENT_STATUS_NOTIFY` and `$COPILOT_HOME` hold here as for the hook.
 
 ## cpstatus and cpchat
 
