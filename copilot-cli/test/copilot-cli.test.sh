@@ -227,6 +227,14 @@ check "one decision" "$(two)" "RUNNING PLAN-READY "
 turn; print 'PLAN READY' > $tmp/ws2/runs/wp3-build.status; completed; stop2
 check "one decision, the other way round" "$(two)" "RUNNING DONE "
 rm $tmp/ws2/runs/wp3-build.status
+# The kept state holds for 5 s only: a turn that ends again later (the agent went on after a question, with no prompt)
+# says what its status file says then. The mark is set 10 s back instead of waiting.
+zmodload zsh/datetime
+aged() { strftime -s t '%Y%m%d%H%M.%S' $(( EPOCHSECONDS - 10 )); touch -t $t $HOME/.copilot/session-state/$sp/.agent-status-turn; }
+turn; print 'WAITING' > $tmp/ws2/runs/wp3-build.status; stop2; aged
+print 'PLAN READY' > $tmp/ws2/runs/wp3-build.status; stop2
+check "a later end of the turn" "$(two)" "WAITING PLAN-READY "
+rm $tmp/ws2/runs/wp3-build.status
 for i in {1..50}; do (( $(/usr/bin/grep -c . $tmp/notified3 2>/dev/null) >= 12 )) && break; sleep 0.1; done
 check "notified" "$(sort -u $tmp/notified3 | tr '\n' ',')" "wp3-build DONE,wp3-build PLAN-READY,wp3-build REVIEW-PASS,wp3-build STOP,wp3-build WAITING,wp3-build WAITING-REVIEW,"
 

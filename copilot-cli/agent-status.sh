@@ -76,9 +76,11 @@ done
 turn=$dir/session-state/$sid/.agent-status-turn
 if [[ $safe == $sid && -d ${turn:h} && $state == RUNNING ]]; then { : > $turn } 2>/dev/null; fi
 # agentStop and agent_completed both end a turn, and the notification names no folder: the first of them decides and
-# keeps the state in the mark, and the other says the same, so a turn is never logged twice with different states.
-kept=
-[[ $state == DONE && $safe == $sid && -f $turn ]] && { read -r kept < $turn } 2>/dev/null
+# keeps the state in the mark, and for 5 s the other says the same, so a turn is never logged twice with different
+# states. A later end of the same turn (the agent went on after a question) looks again.
+kept= recent=()
+[[ $state == DONE && $safe == $sid ]] && recent=($turn(N.ms-5))
+(( $#recent )) && { read -r kept < $turn } 2>/dev/null
 if [[ $kept == (DONE|PLAN-READY|WAITING|WAITING-REVIEW|REVIEW-PASS|STOP) ]]; then
   state=$kept
 elif [[ $state == DONE && $safe == $sid && -f $turn && $name != */* ]]; then
