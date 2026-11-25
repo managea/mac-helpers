@@ -72,22 +72,25 @@ done
 # runs folder of the session's folder or up to two folders below it (runs, */runs, */*/runs), or in a folder of
 # $AGENT_STATUS_RUNS (separated by colons). Only its first words are taken, as one of the states below, and only when it
 # was written in this turn: a prompt leaves a mark in the session's own folder, and an older file says nothing. A name
-# with a / has none: NAME.status would be a path that leads out of the runs folders.
+# with a / has none: NAME.status would be a path that leads out of the runs folders. A mark that is a symlink is never
+# written through or read: the turn then says DONE.
 turn=$dir/session-state/$sid/.agent-status-turn
-if [[ $safe == $sid && -d ${turn:h} && $state == RUNNING ]]; then { : > $turn } 2>/dev/null; fi
+mark=0
+[[ $safe == $sid && -d ${turn:h} && ! -L $turn ]] && mark=1
+if (( mark )) && [[ $state == RUNNING ]]; then { : > $turn } 2>/dev/null; fi
 # agentStop and agent_completed both end a turn, and the notification names no folder (workspace.yaml's is taken). An
 # event that names its own folder, or that found a status file, keeps its state in the mark, and for 5 s the other
 # event says the same; but an agentStop with its own folder looks again when the kept state is DONE. A later end of
 # the same turn (the agent went on after a question) looks again too.
 own= kept= recent=()
-if [[ $state == DONE && $safe == $sid ]]; then
+if (( mark )) && [[ $state == DONE ]]; then
   own=$(print -r -- "$payload" | jq -r '.cwd // empty | strings' 2>/dev/null)
   recent=($turn(N.ms-5))
 fi
 (( $#recent )) && { read -r kept < $turn } 2>/dev/null
 if [[ $kept == (PLAN-READY|WAITING|WAITING-REVIEW|REVIEW-PASS|STOP) || ( $kept == DONE && -z $own ) ]]; then
   state=$kept
-elif [[ $state == DONE && $safe == $sid && -f $turn && $name != */* ]]; then
+elif (( mark )) && [[ $state == DONE && -f $turn && $name != */* ]]; then
   cwd=$own
   [[ -n $cwd ]] || cwd=$(sed -n '/^cwd:/{s/^cwd:[[:space:]]*//;s/[[:space:]]*$//;p;q;}' $yaml 2>/dev/null)
   files=()

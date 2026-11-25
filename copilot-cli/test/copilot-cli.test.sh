@@ -311,6 +311,15 @@ slash() { # slash NAME FILE: what a turn says when FILE says STOP
 check "a name with /" "$(slash feature/login $tmp/sl/p/runs/feature/login.status)" "feature/login DONE"
 check "a name with ../" "$(slash ../../outside/x $tmp/sl/outside/x.status)" "../../outside/x DONE"
 
+# A mark that is a symlink is never written through: the file it points at keeps its text, and the turn says DONE.
+sy=ffff0045-0000-4000-8000-000000000045
+mkdir -p $HOME/.copilot/session-state/$sy $tmp/sy/runs
+printf 'id: %s\ncwd: %s\nname: symark\n' $sy $tmp/sy > $HOME/.copilot/session-state/$sy/workspace.yaml
+print keep > $tmp/sy/victim && ln -s $tmp/sy/victim $HOME/.copilot/session-state/$sy/.agent-status-turn
+hook userPromptSubmitted "{\"sessionId\":\"$sy\"}" >/dev/null; sleep 0.05; print STOP > $tmp/sy/runs/symark.status
+hook agentStop "{\"sessionId\":\"$sy\",\"cwd\":\"$tmp/sy\"}" >/dev/null
+check "a symlinked mark" "$(<$tmp/sy/victim) $(lines | tail -1 | /usr/bin/awk '{ print $1, $2 }')" "keep symark DONE"
+
 # Nothing on stderr and exit 0: a status file with bytes that are not UTF-8 in a UTF-8 locale, a session folder the
 # turn's mark cannot be written in, and options that ~/.zshenv sets, in a folder with a space.
 so=ffff0050-0000-4000-8000-000000000050
