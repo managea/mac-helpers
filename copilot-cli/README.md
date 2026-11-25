@@ -54,8 +54,10 @@ Then start the Copilot CLI again: it loads hooks and agents when it starts (`/en
   folder of more than about 10,000 entries, say) is found through `AGENT_STATUS_RUNS`. agentStop and agent_completed
   both end a turn, and the notification names no folder (workspace.yaml's is taken): the first of them decides, and the
   other says the same.
-- A state repeated for the same session is written once. The detail is the event or notification type, never prompt,
-  reply or tool text. The script takes about 0.1 s and always exits 0, so it never stops a session.
+- A state repeated for the same session is written once, also when two events come at the same moment: runs for one
+  session take turns, through a lock folder (`.agent-status-lock`) in the session's folder. The detail is the event or
+  notification type, never prompt, reply or tool text. The script takes about 0.1 s and always exits 0, so it never
+  stops a session.
 - Declining a permission ends the turn without agentStop, so the log keeps `NEEDS-PERMISSION` until the next prompt.
 - `cplog` (or `cplog 30`) in a terminal split keeps the latest lines in sight.
 

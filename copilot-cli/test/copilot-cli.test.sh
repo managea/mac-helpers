@@ -252,6 +252,33 @@ check "many entries, not read" "$(big b data/x/runs/big.status STOP)" DONE
 check "many entries, its runs" "$(big b/data runs/big.status 'REVIEW PASS')" REVIEW-PASS
 check "many entries, below it" "$(big b/data x/runs/big.status STOP)" DONE
 
+# Two runs at once for one session (agentStop and agent_completed come together): one line and one notification, for
+# sessions with a folder in session-state and without. A lock left by a stopped run is taken over, a live one waited for.
+print -r -- "#!/bin/zsh
+print -r -- \"\$1 \$2\" >> $tmp/notified4" > $tmp/notify4 && chmod 755 $tmp/notify4
+export AGENT_STATUS_NOTIFY=$tmp/notify4
+for k in {10..21}; do
+  id=ffff00$k-0000-4000-8000-0000000000$k
+  (( k < 16 )) && mkdir -p $HOME/.copilot/session-state/$id
+  hook agentStop "{\"sessionId\":\"$id\"}" >/dev/null &
+  hook notification "{\"sessionId\":\"$id\",\"notification_type\":\"agent_completed\"}" >/dev/null &
+  wait
+done
+check "at once" "$(lines | /usr/bin/grep -c '^ffff00[12][0-9]  DONE')" 12
+for i in {1..50}; do (( $(/usr/bin/grep -c . $tmp/notified4 2>/dev/null) >= 12 )) && break; sleep 0.1; done; sleep 0.3
+check "at once, notified" "$(/usr/bin/grep -c DONE $tmp/notified4)" 12
+lk=$HOME/.copilot/session-state/ffff0030-0000-4000-8000-000000000030/.agent-status-lock
+mkdir -p $lk && touch -t 202001010000 $lk
+hook errorOccurred '{"sessionId":"ffff0030-0000-4000-8000-000000000030"}' >/dev/null
+check "a stale lock" "$(lines | tail -1)$([[ -e $lk ]] && print ' (still there)')" "ffff0030  ERROR  errorOccurred"
+lk=$HOME/.copilot/session-state/ffff0031-0000-4000-8000-000000000031/.agent-status-lock
+mkdir -p $lk
+hook errorOccurred '{"sessionId":"ffff0031-0000-4000-8000-000000000031"}' >/dev/null & hp=$!
+sleep 0.4; before=$(lines | /usr/bin/grep -c '^ffff0031 '); rmdir $lk; wait $hp
+check "a live lock" "$before $(lines | /usr/bin/grep -c '^ffff0031 ')" "0 1"
+locks=($HOME/.copilot/session-state/*/.agent-status-lock(N) $HOME/.copilot/.agent-status-lock-*(N))
+check "no lock left" "$locks" ""
+
 # notify-done: the command's output and exit code kept, a line and a notification for each way it can end.
 mine=$tmp/notified2
 print -r -- "#!/bin/zsh

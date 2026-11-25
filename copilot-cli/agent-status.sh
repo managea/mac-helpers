@@ -52,6 +52,20 @@ name=${name[1,40]}
 [[ -n $name && $name != null ]] || name=${safe[1,8]}
 [[ -n $name ]] || exit 0
 
+# One run at a time for a session: agentStop and agent_completed come together, and two runs that both read the log
+# before either writes would both write and both notify. The lock is a folder in the session's folder (else in the CLI's
+# folder), waited for up to 2 s; one older than 10 s was left by a run that was stopped, and is taken over.
+mkdir -p $dir 2>/dev/null
+lock=$dir/.agent-status-lock-${safe[1,64]}
+[[ $safe == $sid && -d $dir/session-state/$sid ]] && lock=$dir/session-state/$sid/.agent-status-lock
+for i in {1..40}; do
+  mkdir $lock 2>/dev/null && { trap 'rmdir $lock 2>/dev/null' EXIT; break; }
+  [[ -d $lock ]] || continue   # just let go, or it cannot be made at all: then this run goes on without it
+  stale=($lock(N/ms+10))
+  (( $#stale )) && rmdir $lock 2>/dev/null && continue
+  sleep 0.05
+done
+
 # A turn that ends says DONE, unless the session keeps a status file that says otherwise: NAME.status, one line, in a
 # runs folder of the session's folder or up to two folders below it (runs, */runs, */*/runs), or in a folder of
 # $AGENT_STATUS_RUNS (separated by colons). Only its first words are taken, as one of the states below, and only when it
@@ -103,7 +117,6 @@ elif [[ $state == DONE && $safe == $sid && -f $turn ]]; then
 fi
 
 # A state repeated for the same session (agentStop and agent_completed both mean DONE) is written once.
-mkdir -p $dir 2>/dev/null
 last=$(tail -n 200 $log 2>/dev/null | N=$name awk '$2 == ENVIRON["N"] { s = $3 } END { print s }')
 [[ $last == $state ]] && exit 0
 if { print -r -- "$(date +%H:%M:%S)  $name  $state  $detail" >> $log } 2>/dev/null; then
