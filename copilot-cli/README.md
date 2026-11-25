@@ -56,8 +56,8 @@ Then start the Copilot CLI again: it loads hooks and agents when it starts (`/en
   other says the same.
 - A state repeated for the same session is written once, also when two events come at the same moment: runs for one
   session take turns, through a lock folder (`.agent-status-lock`) in the session's folder. The detail is the event or
-  notification type, never prompt, reply or tool text. The script takes about 0.1 s and always exits 0, so it never
-  stops a session.
+  notification type, never prompt, reply or tool text. The script takes about 0.1 s, always exits 0 and writes nothing
+  to stderr, whatever options `~/.zshenv` sets, so it never stops a session.
 - Declining a permission ends the turn without agentStop, so the log keeps `NEEDS-PERMISSION` until the next prompt.
 - `cplog` (or `cplog 30`) in a terminal split keeps the latest lines in sight.
 

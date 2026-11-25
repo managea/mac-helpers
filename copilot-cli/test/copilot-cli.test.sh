@@ -291,6 +291,29 @@ slash() { # slash NAME FILE: what a turn says when FILE says STOP
 check "a name with /" "$(slash feature/login $tmp/sl/p/runs/feature/login.status)" "feature/login DONE"
 check "a name with ../" "$(slash ../../outside/x $tmp/sl/outside/x.status)" "../../outside/x DONE"
 
+# Nothing on stderr and exit 0: a status file with bytes that are not UTF-8 in a UTF-8 locale, a session folder the
+# turn's mark cannot be written in, and options that ~/.zshenv sets, in a folder with a space.
+so=ffff0050-0000-4000-8000-000000000050
+sr=ffff0051-0000-4000-8000-000000000051
+sw="$tmp/so ws"
+mkdir -p $HOME/.copilot/session-state/{$so,$sr} "$sw/notes/wip/runs" $tmp/zd
+printf 'id: %s\ncwd: %s\nname: opts\n' $so "$sw" > $HOME/.copilot/session-state/$so/workspace.yaml
+print 'setopt nounset errexit ksharrays shwordsplit globsubst noclobber globdots' > $tmp/zd/.zshenv
+quiet() { # quiet EVENT [SESSION [ZDOTDIR]]: what the hook writes to stdout and stderr, then its exit code
+  print -r -- "{\"sessionId\":\"${2:-$so}\"}" | LC_ALL=en_US.UTF-8 ZDOTDIR=${3:-$tmp/none} zsh $tools/agent-status.sh $1 2>&1
+  print -n "$? "
+}
+opts() { lines | /usr/bin/grep '^opts ' | tail -2 | /usr/bin/awk '{ print $2 }' | /usr/bin/tr '\n' ' '; }
+out=$(quiet userPromptSubmitted; sleep 0.05; printf 'waiting: caf\xe9 table\n' > "$sw/notes/wip/runs/opts.status"
+  quiet agentStop)
+check "not UTF-8" "$out$(opts)" "0 0 RUNNING WAITING "
+chmod 555 $HOME/.copilot/session-state/$sr
+check "a mark that cannot be written" "$(quiet userPromptSubmitted $sr)" "0 "
+chmod 755 $HOME/.copilot/session-state/$sr
+out=$(quiet userPromptSubmitted $so $tmp/zd; sleep 0.05; print 'PLAN READY' > "$sw/notes/wip/runs/opts.status"
+  quiet agentStop $so $tmp/zd; quiet somethingElse $so $tmp/zd)
+check "options" "$out$(opts)" "0 0 0 RUNNING PLAN-READY "
+
 # notify-done: the command's output and exit code kept, a line and a notification for each way it can end.
 mine=$tmp/notified2
 print -r -- "#!/bin/zsh

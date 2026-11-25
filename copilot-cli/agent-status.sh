@@ -6,7 +6,9 @@
 # NEEDS-PERMISSION, ERROR, PLAN-READY, WAITING, WAITING-REVIEW, REVIEW-PASS or STOP line also starts ~/bin/cpsig NAME STATE (a desktop notification) in the background, when it
 # is there; AGENT_STATUS_NOTIFY names another program, or turns that off when set but empty.
 # The CLI's folder is $COPILOT_HOME when set, else ~/.copilot. Tools are found on PATH, with the system folders added
-# for a hook started with a short one.
+# for a hook started with a short one, and zsh's own options hold, whatever ~/.zshenv sets (nounset, say). Nothing it
+# runs writes to stderr.
+emulate -R zsh
 PATH=$PATH:/usr/bin:/bin:/opt/homebrew/bin:/usr/local/bin
 event=${1:-unknown}
 dir=${COPILOT_HOME:-$HOME/.copilot}
@@ -72,7 +74,7 @@ done
 # was written in this turn: a prompt leaves a mark in the session's own folder, and an older file says nothing. A name
 # with a / has none: NAME.status would be a path that leads out of the runs folders.
 turn=$dir/session-state/$sid/.agent-status-turn
-if [[ $safe == $sid && -d ${turn:h} && $state == RUNNING ]]; then : > $turn 2>/dev/null; fi
+if [[ $safe == $sid && -d ${turn:h} && $state == RUNNING ]]; then { : > $turn } 2>/dev/null; fi
 # agentStop and agent_completed both end a turn, and the notification names no folder: the first of them decides and
 # keeps the state in the mark, and the other says the same, so a turn is never logged twice with different states.
 kept=
@@ -83,7 +85,7 @@ elif [[ $state == DONE && $safe == $sid && -f $turn && $name != */* ]]; then
   cwd=$(print -r -- "$payload" | jq -r '.cwd // empty | strings' 2>/dev/null)
   [[ -n $cwd ]] || cwd=$(sed -n '/^cwd:/{s/^cwd:[[:space:]]*//;s/[[:space:]]*$//;p;q;}' $yaml 2>/dev/null)
   files=()
-  for runs in ${(s.:.)AGENT_STATUS_RUNS}; do files+=($runs/$name.status); done
+  for runs in ${(s.:.)AGENT_STATUS_RUNS-}; do files+=($runs/$name.status); done
   # In the session's folder only folders are tried, smallest first, at most 2,000 at each level, and about 10,000
   # entries are read in all: a folder's size says how many it holds without reading it (APFS gives 32 bytes an entry).
   # So a folder with many entries never slows a turn; a glob such as $cwd/*/*/runs opens every entry two levels down.
@@ -104,7 +106,8 @@ elif [[ $state == DONE && $safe == $sid && -f $turn && $name != */* ]]; then
   fi
   for file in $files; do
     [[ -f $file && $file -nt $turn ]] || continue
-    said=$(head -c 200 $file 2>/dev/null | head -n 1 | tr '[:lower:]' '[:upper:]' | tr -s ' \t_' '-')
+    said=$(head -c 200 $file 2>/dev/null | head -n 1 | LC_ALL=C tr '[:lower:]' '[:upper:]' 2>/dev/null |
+      LC_ALL=C tr -s ' \t_' '-' 2>/dev/null)
     case $said in
       PLAN-READY*) state=PLAN-READY ;;
       WAITING-REVIEW*) state=WAITING-REVIEW ;;
