@@ -58,7 +58,13 @@ name=${name[1,40]}
 # was written in this turn: a prompt leaves a mark in the session's own folder, and an older file says nothing.
 turn=$dir/session-state/$sid/.agent-status-turn
 if [[ $safe == $sid && -d ${turn:h} && $state == RUNNING ]]; then : > $turn 2>/dev/null; fi
-if [[ $state == DONE && $safe == $sid && -e $turn ]]; then
+# agentStop and agent_completed both end a turn, and the notification names no folder: the first of them decides and
+# keeps the state in the mark, and the other says the same, so a turn is never logged twice with different states.
+kept=
+[[ $state == DONE && $safe == $sid && -f $turn ]] && { read -r kept < $turn } 2>/dev/null
+if [[ $kept == (DONE|PLAN-READY|WAITING|WAITING-REVIEW|REVIEW-PASS|STOP) ]]; then
+  state=$kept
+elif [[ $state == DONE && $safe == $sid && -f $turn ]]; then
   cwd=$(print -r -- "$payload" | jq -r '.cwd // empty | strings' 2>/dev/null)
   [[ -n $cwd ]] || cwd=$(sed -n '/^cwd:/{s/^cwd:[[:space:]]*//;s/[[:space:]]*$//;p;q;}' $yaml 2>/dev/null)
   files=()
@@ -93,6 +99,7 @@ if [[ $state == DONE && $safe == $sid && -e $turn ]]; then
     esac
     break
   done
+  { print -r -- $state > $turn } 2>/dev/null
 fi
 
 # A state repeated for the same session (agentStop and agent_completed both mean DONE) is written once.

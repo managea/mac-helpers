@@ -216,6 +216,17 @@ turn; print 'STOP' > $pr/runs/wp3-build.status; hook agentStop "{\"sessionId\":\
 check "the folder from workspace.yaml" "$(last)" STOP
 turn; mkdir $pr/notes/wip/runs/wp3-build.status; rm $pr/runs/wp3-build.status; ends
 check "a folder of that name" "$(last)" DONE
+# agentStop names another folder than workspace.yaml, and agent_completed none: whichever comes first decides, the
+# other says the same, and the turn is logged once.
+mkdir -p $tmp/ws2/runs
+stop2() { hook agentStop "{\"sessionId\":\"$sp\",\"cwd\":\"$tmp/ws2\"}" >/dev/null; }
+completed() { hook notification "{\"sessionId\":\"$sp\",\"notification_type\":\"agent_completed\"}" >/dev/null; }
+two() { lines | /usr/bin/grep '^wp3-build ' | tail -2 | /usr/bin/awk '{ print $2 }' | /usr/bin/tr '\n' ' '; }
+turn; print 'PLAN READY' > $tmp/ws2/runs/wp3-build.status; stop2; completed
+check "one decision" "$(two)" "RUNNING PLAN-READY "
+turn; print 'PLAN READY' > $tmp/ws2/runs/wp3-build.status; completed; stop2
+check "one decision, the other way round" "$(two)" "RUNNING DONE "
+rm $tmp/ws2/runs/wp3-build.status
 for i in {1..50}; do (( $(/usr/bin/grep -c . $tmp/notified3 2>/dev/null) >= 12 )) && break; sleep 0.1; done
 check "notified" "$(sort -u $tmp/notified3 | tr '\n' ',')" "wp3-build DONE,wp3-build PLAN-READY,wp3-build REVIEW-PASS,wp3-build STOP,wp3-build WAITING,wp3-build WAITING-REVIEW,"
 
