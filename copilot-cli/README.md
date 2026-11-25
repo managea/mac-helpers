@@ -47,14 +47,16 @@ Then start the Copilot CLI again: it loads hooks and agents when it starts (`/en
 - **A status file:** a session that stops for a decision (the `supervised-builder` agent) keeps one line in
   `NAME.status`, NAME being the session's name (a name with `/` has none). When a turn ends and that file was written
   in this turn, its first words are the state instead of `DONE`: `PLAN READY`, `WAITING ...`, `WAITING REVIEW`,
-  `REVIEW PASS` or `STOP`; nothing after them is written anywhere. It is looked for in `runs`, `*/runs` and `*/*/runs` of the session's folder, and in the
-  folders of `AGENT_STATUS_RUNS` (separated by colons). So give the run log, and with it the status file, the session's name.
-  In the session's folder only folders are tried, smallest first, at most 2,000 at each level, and about 10,000 entries
+  `REVIEW PASS` or `STOP`; nothing after them is written anywhere. It is looked for in `runs`, `*/runs` and `*/*/runs`
+  of the session's folder, and in the folders of `AGENT_STATUS_RUNS` (separated by colons). So give the run log, and
+  with it the status file, the session's name.
+- In the session's folder only folders are tried, smallest first, at most 2,000 at each level, and about 10,000 entries
   are read in all, so a folder with many entries never slows a turn; a status file that is left out that way (below a
-  folder of more than about 10,000 entries, say) is found through `AGENT_STATUS_RUNS`. agentStop and agent_completed
-  both end a turn, and the notification names no folder (workspace.yaml's is taken): the first of them decides, and for
-  5 s the other says the same. A turn that ends again later without a prompt (the agent went on after a question) looks
-  again, at a status file written since the last end.
+  folder of more than about 10,000 entries, say) is found through `AGENT_STATUS_RUNS`.
+- agentStop and agent_completed both end a turn, and the notification names no folder (workspace.yaml's is taken). The
+  one that names its own folder, or finds a status file, decides, and for 5 s the other says the same; a notification
+  that comes first and finds nothing leaves the stop after it to look in its own folder. A turn that ends again later
+  without a prompt (the agent went on after a question) looks again, at a status file written since the last end.
 - A state repeated for the same session is written once, also when two events come at the same moment: runs for one
   session take turns, through a lock folder (`.agent-status-lock`) in the session's folder. The detail is the event or
   notification type, never prompt, reply or tool text. The script takes about 0.1 s, always exits 0 and writes nothing

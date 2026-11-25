@@ -224,8 +224,20 @@ completed() { hook notification "{\"sessionId\":\"$sp\",\"notification_type\":\"
 two() { lines | /usr/bin/grep '^wp3-build ' | tail -2 | /usr/bin/awk '{ print $2 }' | /usr/bin/tr '\n' ' '; }
 turn; print 'PLAN READY' > $tmp/ws2/runs/wp3-build.status; stop2; completed
 check "one decision" "$(two)" "RUNNING PLAN-READY "
+# The other way round, the notification has no folder of its own and finds nothing, so it keeps nothing: the stop
+# that names its folder then finds the file.
+three() { lines | /usr/bin/grep '^wp3-build ' | tail -3 | /usr/bin/awk '{ print $2 }' | /usr/bin/tr '\n' ' '; }
 turn; print 'PLAN READY' > $tmp/ws2/runs/wp3-build.status; completed; stop2
-check "one decision, the other way round" "$(two)" "RUNNING DONE "
+check "one decision, the other way round" "$(three)" "RUNNING DONE PLAN-READY "
+rm $tmp/ws2/runs/wp3-build.status
+# A stop with its own folder that found nothing decides for the notification, which does not look in workspace.yaml's.
+turn; stop2; print 'STOP' > $pr/runs/wp3-build.status; completed
+check "the stop's folder decides" "$(two)" "RUNNING DONE "
+rm $pr/runs/wp3-build.status
+# A stop that kept DONE, then a question, the status file and a second stop within 5 s: that stop looks again.
+turn; stop2; hook notification "{\"sessionId\":\"$sp\",\"notification_type\":\"elicitation_dialog\"}" >/dev/null
+print 'PLAN READY' > $tmp/ws2/runs/wp3-build.status; stop2
+check "a second stop looks again" "$(three)" "DONE QUESTION PLAN-READY "
 rm $tmp/ws2/runs/wp3-build.status
 # The kept state holds for 5 s only: a turn that ends again later (the agent went on after a question, with no prompt)
 # says what its status file says then. The mark is set 10 s back instead of waiting.
@@ -236,7 +248,7 @@ print 'PLAN READY' > $tmp/ws2/runs/wp3-build.status; stop2
 check "a later end of the turn" "$(two)" "WAITING PLAN-READY "
 rm $tmp/ws2/runs/wp3-build.status
 for i in {1..50}; do (( $(/usr/bin/grep -c . $tmp/notified3 2>/dev/null) >= 12 )) && break; sleep 0.1; done
-check "notified" "$(sort -u $tmp/notified3 | tr '\n' ',')" "wp3-build DONE,wp3-build PLAN-READY,wp3-build REVIEW-PASS,wp3-build STOP,wp3-build WAITING,wp3-build WAITING-REVIEW,"
+check "notified" "$(sort -u $tmp/notified3 | tr '\n' ',')" "wp3-build DONE,wp3-build PLAN-READY,wp3-build QUESTION,wp3-build REVIEW-PASS,wp3-build STOP,wp3-build WAITING,wp3-build WAITING-REVIEW,"
 
 # Folders with many entries: folders only, smallest first, at most 2,000 at each level, about 10,000 entries read.
 # In c, aaa (2,100 folders) takes the 2,000 before zzz (2,100 files and x) is read; notes, the smallest, comes first.
