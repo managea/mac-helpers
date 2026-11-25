@@ -1,0 +1,7 @@
+#!/bin/zsh
+# cplog [N]: clears the terminal and follows the last N (15) lines of agent-status.log until Ctrl+C: a status pane in one
+# short command. The log's folder is $COPILOT_HOME when set, else ~/.copilot; a log that is not there yet is waited for.
+n=${1:-15}
+[[ $n == <1-> ]] || { print -u2 "usage: cplog [N]   (N: how many lines, 15)"; exit 2; }
+clear 2>/dev/null
+exec tail -n $n -F ${COPILOT_HOME:-$HOME/.copilot}/agent-status.log

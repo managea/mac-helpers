@@ -134,11 +134,11 @@ check "cpchat bad N" "$(zsh $tools/cpchat Build_API x 2>&1; print $?)" "cpchat: 
 bin=$tmp/bin
 out=$(zsh $tools/install.sh $bin)
 check install "$(print -r -- $out | /usr/bin/awk '{ print $1 }' | sort | uniq -c | /usr/bin/awk '{ print $1, $2 }')" "1 Start
-7 copied
+8 copied
 1 note:"
-check "install check" "$(zsh $tools/install.sh --check $bin | /usr/bin/awk '{ print $1 }' | sort | uniq -c | /usr/bin/awk '{ print $1, $2 }'; print $?)" "7 same
+check "install check" "$(zsh $tools/install.sh --check $bin | /usr/bin/awk '{ print $1 }' | sort | uniq -c | /usr/bin/awk '{ print $1, $2 }'; print $?)" "8 same
 0"
-[[ -x $bin/cpchat && -x $bin/cpsig && -x $bin/notify-done && -x $HOME/.copilot/hooks/agent-status.sh ]] || { print -u2 "FAIL install modes"; fails=$((fails + 1)); }
+[[ -x $bin/cpchat && -x $bin/cpsig && -x $bin/notify-done && -x $bin/cplog && -x $HOME/.copilot/hooks/agent-status.sh ]] || { print -u2 "FAIL install modes"; fails=$((fails + 1)); }
 print changed >> $bin/cpstatus
 check "install check differs" "$(zsh $tools/install.sh --check $bin | /usr/bin/grep -c differs; print ${pipestatus[1]})" "1
 1"
@@ -211,5 +211,18 @@ done
 check "nd no arguments" "$(nd only 2>/dev/null)" "code 2"
 check "nd nobody to tell" "$(AGENT_STATUS_NOTIFY= COPILOT_HOME=$tmp/nd2 zsh $tools/notify-done q true; print $?)" "notify-done q: EXIT 0
 0"
+
+# cplog: the last lines, then what is added, until it is ended.
+mkdir -p $tmp/cl && print -l one two three > $tmp/cl/agent-status.log
+COPILOT_HOME=$tmp/cl zsh $tools/cplog 2 > $tmp/cl/out 2>/dev/null & clpid=$!
+for i in {1..50}; do /usr/bin/grep -q three $tmp/cl/out && break; sleep 0.1; done
+print four >> $tmp/cl/agent-status.log
+for i in {1..50}; do /usr/bin/grep -q four $tmp/cl/out && break; sleep 0.1; done
+kill $clpid 2>/dev/null; wait $clpid 2>/dev/null
+check "cplog" "$(/usr/bin/grep -aoE '(one|two|three|four)' $tmp/cl/out)" "two
+three
+four"
+check "cplog bad N" "$(zsh $tools/cplog x 2>&1 >/dev/null; print $?)" "usage: cplog [N]   (N: how many lines, 15)
+2"
 
 (( fails == 0 )) && print "copilot-cli OK" || { print -u2 "$fails failed"; exit 1; }

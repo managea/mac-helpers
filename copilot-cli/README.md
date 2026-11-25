@@ -46,7 +46,7 @@ Then start the Copilot CLI again: it loads hooks and agents when it starts (`/en
 - A state repeated for the same session is written once. The detail is the event or notification type, never prompt,
   reply or tool text. The script takes about 0.1 s and always exits 0, so it never stops a session.
 - Declining a permission ends the turn without agentStop, so the log keeps `NEEDS-PERMISSION` until the next prompt.
-- `tail -n 15 -F ~/.copilot/agent-status.log` in a terminal split keeps the latest lines in sight.
+- `cplog` (or `cplog 30`) in a terminal split keeps the latest lines in sight.
 
 ## cpsig: a notification when a session wants attention
 
