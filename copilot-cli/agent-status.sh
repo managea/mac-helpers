@@ -55,18 +55,18 @@ name=${name[1,40]}
 [[ -n $name ]] || exit 0
 
 # One run at a time for a session: agentStop and agent_completed come together, and two runs that both read the log
-# before either writes would both write and both notify. The lock is a folder in the session's folder (else in the CLI's
-# folder), waited for up to 2 s; one older than 10 s was left by a run that was stopped, and is taken over.
+# before either writes would both write and both notify. The lock is a kernel lock (fcntl) on .agent-status.lock in the
+# session's folder (else on one in the CLI's folder, for every session without a folder), waited for up to 2 s; then,
+# or when it cannot be taken at all, the run goes on without it. It ends with the run that holds it, also with one that
+# was stopped, so nothing is left behind and nothing is taken over. (A .agent-status-lock folder, which an earlier
+# version locked with, means nothing.)
 mkdir -p $dir 2>/dev/null
-lock=$dir/.agent-status-lock-${safe[1,64]}
-[[ $safe == $sid && -d $dir/session-state/$sid ]] && lock=$dir/session-state/$sid/.agent-status-lock
-for i in {1..40}; do
-  mkdir $lock 2>/dev/null && { trap 'rmdir $lock 2>/dev/null' EXIT; break; }
-  [[ -d $lock ]] || continue   # just let go, or it cannot be made at all: then this run goes on without it
-  stale=($lock(N/ms+10))
-  (( $#stale )) && rmdir $lock 2>/dev/null && continue
-  sleep 0.05
-done
+lock=$dir/.agent-status.lock
+[[ $safe == $sid && -d $dir/session-state/$sid ]] && lock=$dir/session-state/$sid/.agent-status.lock
+if zmodload zsh/system 2>/dev/null; then
+  [[ -e $lock || -L $lock ]] || { : >> $lock } 2>/dev/null
+  zsystem flock -t 2 -i 0.05 $lock 2>/dev/null
+fi
 
 # A turn that ends says DONE, unless the session keeps a status file that says otherwise: NAME.status, one line, in a
 # runs folder of the session's folder or up to two folders below it (runs, */runs, */*/runs), or in a folder of

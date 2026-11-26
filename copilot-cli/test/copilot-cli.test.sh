@@ -273,7 +273,7 @@ check "many entries, its runs" "$(big b/data runs/big.status 'REVIEW PASS')" REV
 check "many entries, below it" "$(big b/data x/runs/big.status STOP)" DONE
 
 # Two runs at once for one session (agentStop and agent_completed come together): one line and one notification, for
-# sessions with a folder in session-state and without. A lock left by a stopped run is taken over, a live one waited for.
+# sessions with a folder in session-state and without.
 print -r -- "#!/bin/zsh
 print -r -- \"\$1 \$2\" >> $tmp/notified4" > $tmp/notify4 && chmod 755 $tmp/notify4
 export AGENT_STATUS_NOTIFY=$tmp/notify4
@@ -287,17 +287,39 @@ done
 check "at once" "$(lines | /usr/bin/grep -c '^ffff00[12][0-9]  DONE')" 12
 for i in {1..50}; do (( $(/usr/bin/grep -c . $tmp/notified4 2>/dev/null) >= 12 )) && break; sleep 0.1; done; sleep 0.3
 check "at once, notified" "$(/usr/bin/grep -c DONE $tmp/notified4)" 12
-lk=$HOME/.copilot/session-state/ffff0030-0000-4000-8000-000000000030/.agent-status-lock
-mkdir -p $lk && touch -t 202001010000 $lk
-hook errorOccurred '{"sessionId":"ffff0030-0000-4000-8000-000000000030"}' >/dev/null
-check "a stale lock" "$(lines | tail -1)$([[ -e $lk ]] && print ' (still there)')" "ffff0030  ERROR  errorOccurred"
-lk=$HOME/.copilot/session-state/ffff0031-0000-4000-8000-000000000031/.agent-status-lock
-mkdir -p $lk
-hook errorOccurred '{"sessionId":"ffff0031-0000-4000-8000-000000000031"}' >/dev/null & hp=$!
-sleep 0.4; before=$(lines | /usr/bin/grep -c '^ffff0031 '); rmdir $lk; wait $hp
+# A run killed while it holds the lock leaves nothing behind: four runs at once just after it log once, and do not
+# wait. A tail that first sleeps 1 s holds the killed run in the lock; that tail ends by itself.
+mkdir -p $tmp/slow && print -r -- '#!/bin/zsh
+sleep 1; exec /usr/bin/tail "$@"' > $tmp/slow/tail && chmod 755 $tmp/slow/tail
+id=ffff0030-0000-4000-8000-000000000030
+mkdir -p $HOME/.copilot/session-state/$id && print -r -- "{\"sessionId\":\"$id\"}" > $tmp/p30
+PATH=$tmp/slow:$PATH zsh $tools/agent-status.sh errorOccurred < $tmp/p30 & hp=$!
+sleep 0.5; kill -9 $hp; wait $hp 2>/dev/null
+t0=$EPOCHREALTIME
+for j in 1 2 3 4; do hook notification "{\"sessionId\":\"$id\",\"notification_type\":\"agent_completed\"}" >/dev/null & done
+wait
+check "a killed run's lock" "$(lines | /usr/bin/grep -c '^ffff0030 ') $(( EPOCHREALTIME - t0 < 1.5 ))" "1 1"
+# A live lock is waited for: while another process holds it, the hook writes nothing; then it goes on.
+id=ffff0031-0000-4000-8000-000000000031
+sd=$HOME/.copilot/session-state/$id
+mkdir -p $sd && : > $sd/.agent-status.lock
+zsh -fc 'zmodload zsh/system && zsystem flock $0 && sleep 0.8' $sd/.agent-status.lock & holder=$!
+sleep 0.2; hook errorOccurred "{\"sessionId\":\"$id\"}" >/dev/null & hp=$!
+sleep 0.3; before=$(lines | /usr/bin/grep -c '^ffff0031 '); wait $holder; wait $hp
 check "a live lock" "$before $(lines | /usr/bin/grep -c '^ffff0031 ')" "0 1"
-locks=($HOME/.copilot/session-state/*/.agent-status-lock(N) $HOME/.copilot/.agent-status-lock-*(N))
-check "no lock left" "$locks" ""
+# A .agent-status-lock folder (what an earlier version locked with), not empty and old, costs nothing, and the lock
+# still works: four runs at once log once. A lock that cannot be taken at all (a folder at its path) costs nothing.
+id=ffff0032-0000-4000-8000-000000000032
+sd=$HOME/.copilot/session-state/$id
+mkdir -p $sd/.agent-status-lock && : > $sd/.agent-status-lock/x && touch -t 202001010000 $sd/.agent-status-lock
+t0=$EPOCHREALTIME
+for j in 1 2 3 4; do hook notification "{\"sessionId\":\"$id\",\"notification_type\":\"agent_completed\"}" >/dev/null & done
+wait
+check "an old lock folder" "$(lines | /usr/bin/grep -c '^ffff0032 ') $(( EPOCHREALTIME - t0 < 1 ))" "1 1"
+id=ffff0033-0000-4000-8000-000000000033
+mkdir -p $HOME/.copilot/session-state/$id/.agent-status.lock/x
+t0=$EPOCHREALTIME; hook errorOccurred "{\"sessionId\":\"$id\"}" >/dev/null
+check "a lock that cannot be taken" "$(lines | tail -1) $(( EPOCHREALTIME - t0 < 1 ))" "ffff0033  ERROR  errorOccurred 1"
 
 # A name with / has no status file: NAME.status would lead out of the runs folders.
 sl=ffff0040-0000-4000-8000-000000000040
