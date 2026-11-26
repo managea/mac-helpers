@@ -239,13 +239,28 @@ turn; stop2; hook notification "{\"sessionId\":\"$sp\",\"notification_type\":\"e
 print 'PLAN READY' > $tmp/ws2/runs/wp3-build.status; stop2
 check "a second stop looks again" "$(three)" "DONE QUESTION PLAN-READY "
 rm $tmp/ws2/runs/wp3-build.status
-# The kept state holds for 5 s only: a turn that ends again later (the agent went on after a question, with no prompt)
-# says what its status file says then. The mark is set 10 s back instead of waiting.
+# The kept state holds for 5 s only; then an end of the same turn (the agent went on after a question, with no prompt)
+# looks again, at the status files written since the prompt: one written after the first end gives its state, and one
+# left as it was gives the same state again, not DONE, whichever event comes later. Instead of waiting, every file of
+# the turn (the mark, the kept state, the status files) is set 10 s back, as if 10 s had passed.
 zmodload zsh/datetime
-aged() { strftime -s t '%Y%m%d%H%M.%S' $(( EPOCHSECONDS - 10 )); touch -t $t $HOME/.copilot/session-state/$sp/.agent-status-turn; }
+aged() {
+  touch -c -A -10 $HOME/.copilot/session-state/$sp/.agent-status-{turn,state} $tmp/ws2/runs/wp3-build.status \
+    $pr/runs/wp3-build.status
+}
 turn; print 'WAITING' > $tmp/ws2/runs/wp3-build.status; stop2; aged
 print 'PLAN READY' > $tmp/ws2/runs/wp3-build.status; stop2
 check "a later end of the turn" "$(two)" "WAITING PLAN-READY "
+turn; print 'WAITING' > $tmp/ws2/runs/wp3-build.status; stop2; aged; stop2
+check "a later stop, the file as it was" "$(two)" "RUNNING WAITING "
+rm $tmp/ws2/runs/wp3-build.status
+turn; print 'STOP' > $pr/runs/wp3-build.status; hook agentStop "{\"sessionId\":\"$sp\",\"cwd\":\"$pr\"}" >/dev/null
+aged; completed
+check "a later notification, the file as it was" "$(two)" "RUNNING STOP "
+rm $pr/runs/wp3-build.status
+# A prompt clears the kept state: a turn that ends within 5 s of the last one, with no status file of its own, is DONE.
+turn; print 'WAITING' > $tmp/ws2/runs/wp3-build.status; stop2; turn; stop2
+check "a prompt clears the kept state" "$(two)" "RUNNING DONE "
 rm $tmp/ws2/runs/wp3-build.status
 for i in {1..50}; do (( $(/usr/bin/grep -c . $tmp/notified3 2>/dev/null) >= 12 )) && break; sleep 0.1; done
 check "notified" "$(sort -u $tmp/notified3 | tr '\n' ',')" "wp3-build DONE,wp3-build PLAN-READY,wp3-build QUESTION,wp3-build REVIEW-PASS,wp3-build STOP,wp3-build WAITING,wp3-build WAITING-REVIEW,"
@@ -341,6 +356,13 @@ print keep > $tmp/sy/victim && ln -s $tmp/sy/victim $HOME/.copilot/session-state
 hook userPromptSubmitted "{\"sessionId\":\"$sy\"}" >/dev/null; sleep 0.05; print STOP > $tmp/sy/runs/symark.status
 hook agentStop "{\"sessionId\":\"$sy\",\"cwd\":\"$tmp/sy\"}" >/dev/null
 check "a symlinked mark" "$(<$tmp/sy/victim) $(lines | tail -1 | /usr/bin/awk '{ print $1, $2 }')" "keep symark DONE"
+# The same for the kept state.
+rm $HOME/.copilot/session-state/$sy/.agent-status-turn
+ln -s $tmp/sy/victim $HOME/.copilot/session-state/$sy/.agent-status-state
+hook userPromptSubmitted "{\"sessionId\":\"$sy\"}" >/dev/null; sleep 0.05; print STOP > $tmp/sy/runs/symark.status
+hook agentStop "{\"sessionId\":\"$sy\",\"cwd\":\"$tmp/sy\"}" >/dev/null
+check "a symlinked kept state" "$(<$tmp/sy/victim) $(lines | tail -2 | /usr/bin/awk '{ print $2 }' | /usr/bin/tr '\n' ' ')" \
+  "keep RUNNING DONE "
 
 # Nothing on stderr and exit 0: a status file with bytes that are not UTF-8 in a UTF-8 locale, a session folder the
 # turn's mark cannot be written in, and options that ~/.zshenv sets, in a folder with a space.

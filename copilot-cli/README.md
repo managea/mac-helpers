@@ -52,11 +52,14 @@ Then start the Copilot CLI again: it loads hooks and agents when it starts (`/en
   with it the status file, the session's name.
 - In the session's folder only folders are tried, smallest first, at most 2,000 at each level, and about 10,000 entries
   are read in all, so a folder with many entries never slows a turn; a status file that is left out that way (below a
-  folder of more than about 10,000 entries, say) is found through `AGENT_STATUS_RUNS`.
+  folder of more than about 10,000 entries, say) is found through `AGENT_STATUS_RUNS`. Looking below `runs` needs
+  zsh's `zsh/stat` module, and the lock below needs `zsh/system`; both come with zsh (macOS's `/bin/zsh` has them).
+  Without `zsh/stat` only `runs` and `AGENT_STATUS_RUNS` are searched; without `zsh/system` runs do not take turns.
 - agentStop and agent_completed both end a turn, and the notification names no folder (workspace.yaml's is taken). The
   one that names its own folder, or finds a status file, decides, and for 5 s the other says the same; a notification
-  that comes first and finds nothing leaves the stop after it to look in its own folder. A turn that ends again later
-  without a prompt (the agent went on after a question) looks again, at a status file written since the last end.
+  that comes first and finds nothing leaves the stop after it to look in its own folder. After 5 s an end of the same
+  turn (the agent went on after a question, with no prompt) looks again, at the status files written since the prompt:
+  a file the agent wrote since gives its state, and one left as it was gives the same state again.
 - A state repeated for the same session is written once, also when two events come at the same moment: runs for one
   session take turns, through a kernel lock on `.agent-status.lock` in the session's folder, which ends with the run
   that holds it (a run that cannot have it within 2 s goes on without it). The detail is the event or notification
